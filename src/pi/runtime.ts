@@ -1,7 +1,8 @@
 import { mkdir } from "node:fs/promises";
-import { createAgentSession, SessionManager, type AgentSessionEvent, type SessionInfo } from "@mariozechner/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader, SessionManager, type AgentSessionEvent, type SessionInfo } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { getSessionDirectoryForThread } from "./session-store.js";
+import { buildServiceProfileContext, createServiceProfile } from "../runtime/service-profile.js";
 
 export interface PiPromptResult {
   artifactsOutput: string;
@@ -14,6 +15,7 @@ export interface PiPromptCallbacks {
 }
 
 interface CachedSession {
+  cwd: string;
   session: Awaited<ReturnType<typeof createAgentSession>>["session"];
 }
 
@@ -25,20 +27,36 @@ export class PiRuntime {
 
   private async getOrCreateSession(threadKey: string, cwd: string): Promise<CachedSession> {
     const existing = this.sessions.get(threadKey);
-    if (existing) {
+    if (existing && existing.cwd === cwd) {
       return existing;
+    }
+
+    if (existing && existing.cwd !== cwd) {
+      existing.session.dispose();
+      this.sessions.delete(threadKey);
     }
 
     const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
     await mkdir(sessionDir, { recursive: true });
 
+    const resourceLoader = new DefaultResourceLoader({
+      cwd,
+      agentDir: this.config.agentDir,
+      appendSystemPromptOverride: (base) => [
+        ...base,
+        buildServiceProfileContext(createServiceProfile(this.config)),
+      ],
+    });
+    await resourceLoader.reload();
+
     const { session } = await createAgentSession({
       cwd,
       agentDir: this.config.agentDir,
+      resourceLoader,
       sessionManager: SessionManager.continueRecent(cwd, sessionDir),
     });
 
-    const cached = { session };
+    const cached = { cwd, session };
     this.sessions.set(threadKey, cached);
     return cached;
   }

@@ -1,11 +1,13 @@
+import { readFile } from "node:fs/promises";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
 import { Chat, type Thread } from "chat";
 import type { Config } from "./config.js";
+import { isUserAllowed } from "./runtime/access-control.js";
 import { checkRateLimit } from "./runtime/rate-limiter.js";
 import { detectFiles, snapshotWorkspace } from "./runtime/artifact-detector.js";
 import { splitMessage } from "./runtime/message-splitter.js";
-import { formatPath, getWorkspace, setWorkspace } from "./runtime/workspace.js";
+import { configureWorkspaceState, formatPath, getWorkspace, setWorkspace } from "./runtime/workspace.js";
 import { PiRuntime } from "./pi/runtime.js";
 import { getThreadKeyFromId } from "./pi/session-store.js";
 
@@ -24,6 +26,19 @@ async function replyLong(thread: Thread, text: string): Promise<void> {
   for (const chunk of splitMessage(text)) {
     await thread.post(chunk);
   }
+}
+
+async function sendDetectedFile(thread: Thread, file: { filename: string; path: string }): Promise<void> {
+  const data = await readFile(file.path);
+  await thread.post({
+    raw: file.filename,
+    files: [
+      {
+        data,
+        filename: file.filename,
+      },
+    ],
+  });
 }
 
 async function handleCommand(thread: Thread, messageText: string, config: Config, runtime: PiRuntime): Promise<boolean> {
@@ -140,11 +155,16 @@ async function handlePrompt(thread: Thread, messageText: string, config: Config,
 
   const files = await detectFiles(result.artifactsOutput, workspace, beforeSnapshot);
   for (const file of files) {
-    await thread.post(`生成文件：${file.filename}\n${file.path}`);
+    try {
+      await sendDetectedFile(thread, file);
+    } catch {
+      await thread.post(`生成文件：${file.filename}\n${file.path}`);
+    }
   }
 }
 
 export function createBot(config: Config): Chat {
+  configureWorkspaceState(config.baseDir);
   const runtime = new PiRuntime(config);
   const bot = new Chat({
     userName: "shellRaining_bot",
@@ -160,6 +180,10 @@ export function createBot(config: Config): Chat {
   });
 
   bot.onDirectMessage(async (thread, message) => {
+    if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
+      await thread.post("未授权访问。");
+      return;
+    }
     await thread.subscribe();
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
@@ -168,6 +192,10 @@ export function createBot(config: Config): Chat {
   });
 
   bot.onNewMention(async (thread, message) => {
+    if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
+      await thread.post("未授权访问。");
+      return;
+    }
     await thread.subscribe();
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
@@ -176,6 +204,10 @@ export function createBot(config: Config): Chat {
   });
 
   bot.onSubscribedMessage(async (thread, message) => {
+    if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
+      await thread.post("未授权访问。");
+      return;
+    }
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
     }

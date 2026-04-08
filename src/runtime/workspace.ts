@@ -2,7 +2,7 @@ import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-const STATE_FILE = join(homedir(), ".shell-raining", "state", "workspaces.json");
+let stateFilePath = join(homedir(), ".shell-raining", "state", "workspaces.json");
 
 interface WorkspaceState {
   [threadId: string]: string;
@@ -12,7 +12,7 @@ let state: WorkspaceState = {};
 let loaded = false;
 
 async function ensureStateDir(): Promise<void> {
-  await mkdir(dirname(STATE_FILE), { recursive: true });
+  await mkdir(dirname(stateFilePath), { recursive: true });
 }
 
 async function loadState(): Promise<void> {
@@ -21,7 +21,7 @@ async function loadState(): Promise<void> {
   }
 
   try {
-    const data = await readFile(STATE_FILE, "utf-8");
+    const data = await readFile(stateFilePath, "utf-8");
     state = JSON.parse(data) as WorkspaceState;
   } catch {
     state = {};
@@ -32,7 +32,12 @@ async function loadState(): Promise<void> {
 
 async function saveState(): Promise<void> {
   await ensureStateDir();
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+  await writeFile(stateFilePath, JSON.stringify(state, null, 2));
+}
+
+export function configureWorkspaceState(baseDir: string): void {
+  stateFilePath = join(baseDir, "state", "workspaces.json");
+  resetWorkspaceStateForTesting();
 }
 
 export async function getWorkspace(threadId: string, fallbackWorkspace: string = homedir()): Promise<string> {
