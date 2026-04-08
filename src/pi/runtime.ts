@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { createAgentSession, SessionManager, type AgentSessionEvent } from "@mariozechner/pi-coding-agent";
+import { createAgentSession, SessionManager, type AgentSessionEvent, type SessionInfo } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { getSessionDirectoryForThread } from "./session-store.js";
 
@@ -46,6 +46,17 @@ export class PiRuntime {
   async newSession(threadKey: string, cwd: string): Promise<void> {
     const { session } = await this.getOrCreateSession(threadKey, cwd);
     await session.newSession();
+  }
+
+  async listSessions(threadKey: string, cwd: string): Promise<SessionInfo[]> {
+    const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
+    await mkdir(sessionDir, { recursive: true });
+    return SessionManager.list(cwd, sessionDir);
+  }
+
+  async switchSession(threadKey: string, cwd: string, sessionPath: string): Promise<boolean> {
+    const { session } = await this.getOrCreateSession(threadKey, cwd);
+    return session.switchSession(sessionPath);
   }
 
   async prompt(threadKey: string, text: string, cwd: string, callbacks: PiPromptCallbacks = {}): Promise<PiPromptResult> {

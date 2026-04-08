@@ -11,12 +11,12 @@ Core stack:
 Features in v0:
 
 - Telegram DM and mention entrypoints
-- Persistent per-thread Pi sessions
+- Persistent per-thread Pi sessions with `/session` listing and switching
 - Persistent workspace state
 - Pi skills sync via `~/.pi/agent/settings.json`
 - Tool activity status updates
 - File artifact detection and Telegram upload
-- Commands: `/start`, `/help`, `/pwd`, `/cd`, `/home`, `/new`, `/status`
+- Commands: `/start`, `/help`, `/pwd`, `/cd`, `/home`, `/session`, `/session switch <n>`, `/new`, `/status`
 
 Runtime notes:
 

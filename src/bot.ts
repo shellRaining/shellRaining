@@ -47,6 +47,8 @@ async function handleCommand(thread: Thread, messageText: string, config: Config
         "/pwd",
         "/cd <path>",
         "/home",
+        "/session",
+        "/session switch <n>",
         "/new",
         "/status",
       ].join("\n"));
@@ -68,6 +70,40 @@ async function handleCommand(thread: Thread, messageText: string, config: Config
       await runtime.newSession(threadKey, currentWorkspace);
       await thread.post("已创建新会话。后续消息会使用新的 Pi session。");
       return true;
+    case "session": {
+      if (!parsed.args) {
+        const sessions = await runtime.listSessions(threadKey, currentWorkspace);
+        if (sessions.length === 0) {
+          await thread.post("当前还没有可切换的 session。\n直接发送消息即可创建新的 Pi session。");
+          return true;
+        }
+
+        const lines = sessions.slice(0, 10).map((session, index) => {
+          const title = session.name || session.firstMessage || "(empty)";
+          return `${index + 1}. ${title.slice(0, 60)}\n${session.path}`;
+        });
+        await thread.post(`最近的 session：\n\n${lines.join("\n\n")}\n\n使用 /session switch <编号> 切换。`);
+        return true;
+      }
+
+      const match = parsed.args.match(/^switch\s+(\d+)$/i);
+      if (!match) {
+        await thread.post("用法：/session 或 /session switch <编号>");
+        return true;
+      }
+
+      const sessions = await runtime.listSessions(threadKey, currentWorkspace);
+      const index = Number.parseInt(match[1], 10) - 1;
+      const target = sessions[index];
+      if (!target) {
+        await thread.post("找不到对应编号的 session。");
+        return true;
+      }
+
+      const switched = await runtime.switchSession(threadKey, currentWorkspace, target.path);
+      await thread.post(switched ? `已切换到 session：${target.path}` : "session 切换被取消。");
+      return true;
+    }
     case "status":
       await thread.post(`thread=${thread.id}\nworkspace=${formatPath(currentWorkspace)}\nskills=${config.skillsDir}`);
       return true;
