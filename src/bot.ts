@@ -22,9 +22,13 @@ function parseCommand(messageText: string | null | undefined): { command: string
   return { command, args: rest.join(" ").trim() };
 }
 
+export function toTelegramReplyMessage(text: string): { markdown: string } {
+  return { markdown: text };
+}
+
 async function replyLong(thread: Thread, text: string): Promise<void> {
   for (const chunk of splitMessage(text)) {
-    await thread.post(chunk);
+    await thread.post(toTelegramReplyMessage(chunk));
   }
 }
 
