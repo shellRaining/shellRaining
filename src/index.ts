@@ -7,6 +7,14 @@ import { syncPiSettings } from "./runtime/pi-settings.js";
 
 loadEnv();
 
+if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.https_proxy) {
+  const undici = (await import("undici")) as {
+    EnvHttpProxyAgent: new () => unknown;
+    setGlobalDispatcher: (dispatcher: unknown) => void;
+  };
+  undici.setGlobalDispatcher(new undici.EnvHttpProxyAgent());
+}
+
 const config = loadConfig();
 await syncPiSettings({
   agentDir: config.agentDir,
