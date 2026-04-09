@@ -26,9 +26,30 @@ export function toTelegramReplyMessage(text: string): { markdown: string } {
   return { markdown: text };
 }
 
+export const TELEGRAM_CONCURRENCY = {
+  strategy: "debounce",
+  debounceMs: 1200,
+} as const;
+
+export function shouldFallbackToRawTelegramReply(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const typedError = error as Error & { code?: string };
+  return typedError.code === "VALIDATION_ERROR" && error.message.includes("can't parse entities");
+}
+
 async function replyLong(thread: Thread, text: string): Promise<void> {
   for (const chunk of splitMessage(text)) {
-    await thread.post(toTelegramReplyMessage(chunk));
+    try {
+      await thread.post(toTelegramReplyMessage(chunk));
+    } catch (error) {
+      if (!shouldFallbackToRawTelegramReply(error)) {
+        throw error;
+      }
+      await thread.post(chunk);
+    }
   }
 }
 
@@ -172,6 +193,7 @@ export function createBot(config: Config): Chat {
   const runtime = new PiRuntime(config);
   const bot = new Chat({
     userName: "shellRaining_bot",
+    concurrency: TELEGRAM_CONCURRENCY,
     adapters: {
       telegram: createTelegramAdapter({
         botToken: config.telegramToken,
