@@ -8,6 +8,6 @@ describe("message-splitter", () => {
 
   it("splits long messages by newline when possible", () => {
     const chunks = splitMessage("12345\n67890", 7);
-    expect(chunks).toEqual(["12345", "67890"]);
+    expect(chunks).toEqual(["12345", "\n67890"]);
   });
 });

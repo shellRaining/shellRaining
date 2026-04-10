@@ -15,15 +15,20 @@ export function splitMessage(text: string, maxLength: number = DEFAULT_MAX_MESSA
     }
 
     let splitIndex = remaining.lastIndexOf("\n", maxLength);
-    if (splitIndex === -1 || splitIndex < maxLength / 2) {
+    const splitByNewline = splitIndex !== -1 && splitIndex >= maxLength / 2;
+    if (!splitByNewline) {
       splitIndex = remaining.lastIndexOf(" ", maxLength);
     }
     if (splitIndex === -1 || splitIndex < maxLength / 2) {
       splitIndex = maxLength;
     }
 
+    while (splitByNewline && splitIndex > 0 && remaining[splitIndex] === "\n" && remaining[splitIndex - 1] === "\n") {
+      splitIndex -= 1;
+    }
+
     chunks.push(remaining.slice(0, splitIndex));
-    remaining = remaining.slice(splitIndex).trimStart();
+    remaining = remaining.slice(splitIndex);
   }
 
   return chunks;

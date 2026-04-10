@@ -133,14 +133,14 @@ export class PiRuntime {
       await session.prompt(text);
       return {
         artifactsOutput: `${output}\n${toolOutput}`.trim(),
-        text: output.trim() || "(no output)",
+        text: output || "(no output)",
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return {
         artifactsOutput: `${output}\n${toolOutput}`.trim(),
         error: message,
-        text: output.trim(),
+        text: output,
       };
     } finally {
       unsubscribe();
