@@ -1,6 +1,6 @@
 ---
 name: project-commands
-description: shell-raining 当前已验证可用的开发命令和检查命令。
+description: shellRaining 当前已验证可用的开发命令和检查命令。
 ---
 
 # Project Commands

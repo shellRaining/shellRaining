@@ -25,7 +25,7 @@ await syncPiSettings({
 const bot = createBot(config);
 const app = new Hono();
 
-app.get("/", (c) => c.text("shell-raining is running"));
+app.get("/", (c) => c.text("shellRaining is running"));
 app.get("/health", (c) => c.json({ status: "ok" }));
 app.post("/webhook/telegram", async (c) => bot.webhooks.telegram(c.req.raw));
 

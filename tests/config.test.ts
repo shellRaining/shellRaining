@@ -22,12 +22,12 @@ describe("config", () => {
     expect(() => loadConfig()).toThrow("TELEGRAM_BOT_TOKEN is required");
   });
 
-  it("uses shell-raining defaults", async () => {
+  it("uses shellRaining defaults", async () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
     const { loadConfig } = await import("../src/config.js");
     const config = loadConfig();
-    expect(config.workspace).toBe("/mock/home/shell-raining-workspace");
-    expect(config.baseDir).toBe("/mock/home/.shell-raining");
+    expect(config.workspace).toBe("/mock/home/shellRaining-workspace");
+    expect(config.baseDir).toBe("/mock/home/.shellRaining");
     expect(config.agentDir).toBe("/mock/home/.pi/agent");
   });
 

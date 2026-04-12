@@ -27,7 +27,7 @@
 
 - [ ] Write failing tests for config, rate limiter, workspace, and artifact detection.
 - [ ] Run `pnpm test tests/config.test.ts tests/rate-limiter.test.ts tests/workspace.test.ts tests/artifact-detector.test.ts` and verify failures are due to missing modules.
-- [ ] Implement minimal modules by porting the corresponding mini-claw logic and renaming state roots from `.mini-claw` to `.shell-raining`.
+- [ ] Implement minimal modules by porting the corresponding mini-claw logic and renaming state roots from `.mini-claw` to `.shellRaining`.
 - [ ] Re-run the same test command until all tests pass.
 
 ### Task 2: Add Pi Settings Sync And Environment Profile

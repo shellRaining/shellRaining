@@ -41,8 +41,8 @@ export function loadConfig(): Config {
   }
 
   const home = homedir();
-  const baseDir = process.env.SHELL_RAINING_BASE_DIR?.trim() || join(home, ".shell-raining");
-  const workspace = process.env.SHELL_RAINING_WORKSPACE?.trim() || join(home, "shell-raining-workspace");
+  const baseDir = process.env.SHELL_RAINING_BASE_DIR?.trim() || join(home, ".shellRaining");
+  const workspace = process.env.SHELL_RAINING_WORKSPACE?.trim() || join(home, "shellRaining-workspace");
   const agentDir = process.env.SHELL_RAINING_AGENT_DIR?.trim() || join(home, ".pi", "agent");
   const skillsDir = process.env.SHELL_RAINING_SKILLS_DIR?.trim() || join(home, "Documents", "dotfiles", "skills");
   const allowedUsers = process.env.SHELL_RAINING_ALLOWED_USERS?.trim()

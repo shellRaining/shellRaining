@@ -2,7 +2,7 @@ import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-let stateFilePath = join(homedir(), ".shell-raining", "state", "workspaces.json");
+let stateFilePath = join(homedir(), ".shellRaining", "state", "workspaces.json");
 
 interface WorkspaceState {
   [threadId: string]: string;

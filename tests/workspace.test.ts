@@ -50,7 +50,7 @@ describe("workspace", () => {
     const result = await setWorkspace("thread-123", "~/projects");
     expect(result).toBe("/mock/home/projects");
     expect(mockWriteFile).toHaveBeenCalledWith(
-      "/mock/home/.shell-raining/state/workspaces.json",
+      "/mock/home/.shellRaining/state/workspaces.json",
       expect.stringContaining("/mock/home/projects"),
     );
   });

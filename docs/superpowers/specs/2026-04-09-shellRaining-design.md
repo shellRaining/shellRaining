@@ -44,7 +44,7 @@ shellRaining 是一个 Telegram-first 的个人工程代理，定位为强工具
 
 ## 状态持久化
 
-- 基础目录：`~/.shell-raining/`
+- 基础目录：`~/.shellRaining/`
 - 工作区状态：`state/workspaces.json`
 - 每线程 Pi session 目录：`sessions/<thread-key>/`
 - Pi settings 备份：`backups/pi-settings-*.json`

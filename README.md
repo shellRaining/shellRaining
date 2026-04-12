@@ -1,4 +1,4 @@
-# shell-raining
+# shellRaining
 
 Telegram-first personal coding agent for shellraining.
 
@@ -22,7 +22,7 @@ Runtime notes:
 
 - Start the service with `pnpm dev` or `pnpm start` after `pnpm build`.
 - Telegram should be configured to send webhooks to `/webhook/telegram`.
-- On startup, shell-raining merges `SHELL_RAINING_SKILLS_DIR` into `~/.pi/agent/settings.json` and writes a backup under `~/.shell-raining/backups/` when changes are needed.
+- On startup, shellRaining merges `SHELL_RAINING_SKILLS_DIR` into `~/.pi/agent/settings.json` and writes a backup under `~/.shellRaining/backups/` when changes are needed.
 
 Development:
 
