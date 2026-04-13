@@ -18,6 +18,22 @@ Features in v0:
 - File artifact detection and Telegram upload
 - Commands: `/start`, `/help`, `/pwd`, `/cd`, `/home`, `/session`, `/session switch <n>`, `/new`, `/status`
 
+Telegram input support:
+
+- Text and emoji are sent to Pi as prompt text.
+- Telegram photo/image attachments are downloaded, saved under `~/.shellRaining/inbox/`, and passed to Pi as image inputs.
+- Telegram document attachments such as TXT, PDF, and XLSX are downloaded and sent to Pi as local absolute file paths. shellRaining does not parse document contents itself.
+- Telegram voice/audio attachments are downloaded and sent as local absolute file paths. When STT is configured, the transcript is included in the prompt.
+- Telegram stickers are represented as lightweight text using their sticker emoji when Telegram provides one.
+
+Optional STT configuration:
+
+```bash
+SHELL_RAINING_STT_BASE_URL=https://stt.example.com
+SHELL_RAINING_STT_API_KEY=optional-token
+SHELL_RAINING_STT_MODEL=whisper-1
+```
+
 Runtime notes:
 
 - Start the service with `pnpm dev` or `pnpm start` after `pnpm build`.
