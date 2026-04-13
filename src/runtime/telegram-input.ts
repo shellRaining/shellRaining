@@ -114,12 +114,15 @@ export async function normalizeTelegramInput(
             data: data.toString("base64"),
             mimeType,
           });
+          parts.push(`[Telegram image: ${saved.path}]`);
         } else {
           warnings.push(
             `Image attachment ${saved.filename} did not include an image MIME type.`,
           );
+          documentLines.push(
+            `- ${saved.filename}${saved.mimeType ? ` (${saved.mimeType})` : ""}: ${saved.path}`,
+          );
         }
-        parts.push(`[Telegram image: ${saved.path}]`);
         continue;
       }
 
@@ -140,8 +143,6 @@ export async function normalizeTelegramInput(
               error instanceof Error ? error.message : String(error);
             warnings.push(`STT failed for ${saved.filename}: ${message}`);
           }
-        } else {
-          warnings.push(`STT is not configured for ${saved.filename}.`);
         }
         parts.push(`[Telegram audio file]\n${saved.path}`);
         continue;

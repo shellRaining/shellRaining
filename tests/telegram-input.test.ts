@@ -87,6 +87,37 @@ describe("telegram-input", () => {
     expect(result.savedFiles[0]?.filename).toBe("photo.png");
   });
 
+  it("keeps image-typed attachments with non-image MIME as generic attachments", async () => {
+    const { normalizeTelegramInput } =
+      await import("../src/runtime/telegram-input.js");
+
+    const result = await normalizeTelegramInput({
+      baseDir: tempRoot,
+      message: {
+        attachments: [
+          attachment({
+            data: Buffer.from("pdf-data"),
+            mimeType: "application/pdf",
+            name: "mislabelled.pdf",
+            type: "image",
+          }),
+        ],
+        id: "m2b",
+        text: "",
+      },
+      sttConfig: {},
+      threadKey: "telegram__1",
+    });
+
+    expect(result.images).toEqual([]);
+    expect(result.text).not.toContain("[Telegram image:");
+    expect(result.text).toContain("[Telegram attachments]");
+    expect(result.text).toContain("mislabelled.pdf (application/pdf):");
+    expect(result.warnings).toEqual([
+      "Image attachment mislabelled.pdf did not include an image MIME type.",
+    ]);
+  });
+
   it("keeps document attachments as file paths without parsing contents", async () => {
     const { normalizeTelegramInput } =
       await import("../src/runtime/telegram-input.js");
@@ -143,6 +174,36 @@ describe("telegram-input", () => {
     expect(result.text).toContain("[Telegram voice transcript]");
     expect(result.text).toContain("整理会议纪要");
     expect(result.text).toContain("[Telegram audio file]");
+  });
+
+  it("keeps audio file path without warning when STT is not configured", async () => {
+    const { normalizeTelegramInput } =
+      await import("../src/runtime/telegram-input.js");
+    const transcribe = vi.fn().mockResolvedValue("unused transcript");
+
+    const result = await normalizeTelegramInput({
+      baseDir: tempRoot,
+      message: {
+        attachments: [
+          attachment({
+            data: Buffer.from("voice"),
+            mimeType: "audio/ogg",
+            name: "voice.ogg",
+            type: "audio",
+          }),
+        ],
+        id: "m4b",
+        text: "",
+      },
+      sttConfig: {},
+      threadKey: "telegram__1",
+      transcribeAudio: transcribe,
+    });
+
+    expect(transcribe).not.toHaveBeenCalled();
+    expect(result.text).toContain("[Telegram audio file]");
+    expect(result.text).not.toContain("[Telegram input warnings]");
+    expect(result.warnings).toEqual([]);
   });
 
   it("returns unprocessable input when no content was recognized", async () => {
