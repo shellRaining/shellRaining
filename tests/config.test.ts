@@ -40,4 +40,20 @@ describe("config", () => {
     expect(config.allowedUsers).toEqual([123, 456]);
     expect(config.rateLimitCooldownMs).toBe(10000);
   });
+
+  it("parses optional STT config", async () => {
+    process.env.TELEGRAM_BOT_TOKEN = "test-token";
+    process.env.SHELL_RAINING_STT_BASE_URL = " https://stt.shellraining.xyz/ ";
+    process.env.SHELL_RAINING_STT_API_KEY = " stt-secret ";
+    process.env.SHELL_RAINING_STT_MODEL = " faster-whisper-large-v3 ";
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = loadConfig();
+
+    expect(config.stt).toEqual({
+      apiKey: "stt-secret",
+      baseUrl: "https://stt.shellraining.xyz",
+      model: "faster-whisper-large-v3",
+    });
+  });
 });

@@ -12,6 +12,11 @@ export interface Config {
   allowedUsers: number[];
   rateLimitCooldownMs: number;
   showThinking: boolean;
+  stt: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  };
   serviceProfile: {
     crawlUrl: string;
     vikunjaUrl: string;
@@ -32,6 +37,14 @@ function parseBoolean(value: string | undefined, defaultValue: boolean): boolean
     return false;
   }
   return defaultValue;
+}
+
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end--;
+  }
+  return value.slice(0, end);
 }
 
 export function loadConfig(): Config {
@@ -62,6 +75,13 @@ export function loadConfig(): Config {
     allowedUsers,
     rateLimitCooldownMs: Number.parseInt(process.env.SHELL_RAINING_RATE_LIMIT_COOLDOWN_MS || "5000", 10),
     showThinking: parseBoolean(process.env.SHELL_RAINING_SHOW_THINKING, false),
+    stt: {
+      apiKey: process.env.SHELL_RAINING_STT_API_KEY?.trim() || undefined,
+      baseUrl: process.env.SHELL_RAINING_STT_BASE_URL?.trim()
+        ? trimTrailingSlashes(process.env.SHELL_RAINING_STT_BASE_URL.trim())
+        : undefined,
+      model: process.env.SHELL_RAINING_STT_MODEL?.trim() || undefined,
+    },
     serviceProfile: {
       crawlUrl: process.env.SHELL_RAINING_CRAWL_URL?.trim() || "https://crawl.shellraining.xyz",
       vikunjaUrl: process.env.SHELL_RAINING_VIKUNJA_URL?.trim() || "https://todo.shellraining.xyz",
