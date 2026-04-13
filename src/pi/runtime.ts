@@ -10,7 +10,14 @@ export interface PiPromptResult {
   text: string;
 }
 
+export interface PiImageInput {
+  type: "image";
+  data: string;
+  mimeType: string;
+}
+
 export interface PiPromptCallbacks {
+  images?: PiImageInput[];
   onStatus?: (status: string) => Promise<void> | void;
 }
 
@@ -130,7 +137,7 @@ export class PiRuntime {
     });
 
     try {
-      await session.prompt(text);
+      await session.prompt(text, callbacks.images?.length ? { images: callbacks.images } : undefined);
       return {
         artifactsOutput: `${output}\n${toolOutput}`.trim(),
         text: output || "(no output)",
