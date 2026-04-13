@@ -49,6 +49,14 @@ export function isTelegramInputProcessable(input: NormalizedTelegramInput): bool
   return input.isProcessable;
 }
 
+export function hasPotentialTelegramInput(message: TelegramInputMessage): boolean {
+  return Boolean(
+    message.text?.trim() ||
+    message.attachments?.length ||
+    message.raw?.sticker,
+  );
+}
+
 async function replyLong(thread: Thread, text: string): Promise<void> {
   for (const chunk of splitMessage(text)) {
     try {
@@ -163,6 +171,17 @@ async function handleCommand(thread: Thread, messageText: string, config: Config
 
 async function handlePrompt(thread: Thread, message: TelegramInputMessage, config: Config, runtime: PiRuntime): Promise<void> {
   const threadKey = getThreadKeyFromId(thread.id);
+  if (!hasPotentialTelegramInput(message)) {
+    await thread.post("没有识别到可处理的 Telegram 输入。请发送文本、图片、文件、语音或贴纸。");
+    return;
+  }
+
+  const allowed = checkRateLimit(Number.parseInt(thread.channelId.replace(/\D/g, "") || "0", 10), config.rateLimitCooldownMs);
+  if (!allowed.allowed) {
+    await thread.post(`请等待 ${Math.ceil((allowed.retryAfterMs || 0) / 1000)} 秒后再发送下一条消息。`);
+    return;
+  }
+
   const normalized = await normalizeTelegramInput({
     baseDir: config.baseDir,
     message,
@@ -171,12 +190,6 @@ async function handlePrompt(thread: Thread, message: TelegramInputMessage, confi
   });
   if (!isTelegramInputProcessable(normalized)) {
     await thread.post("没有识别到可处理的 Telegram 输入。请发送文本、图片、文件、语音或贴纸。");
-    return;
-  }
-
-  const allowed = checkRateLimit(Number.parseInt(thread.channelId.replace(/\D/g, "") || "0", 10), config.rateLimitCooldownMs);
-  if (!allowed.allowed) {
-    await thread.post(`请等待 ${Math.ceil((allowed.retryAfterMs || 0) / 1000)} 秒后再发送下一条消息。`);
     return;
   }
 
