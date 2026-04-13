@@ -28,14 +28,22 @@ function safePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "message";
 }
 
-export function safeTelegramFilename(filename: string | undefined, fallbackFilename: string): string {
-  const trimmed = filename?.trim();
+function safeTelegramFilenameCandidate(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
   if (!trimmed) {
-    return fallbackFilename;
+    return undefined;
   }
 
   const base = basename(trimmed).trim();
-  return base || fallbackFilename;
+  if (!base || base === "." || base === ".." || base.includes("/") || base.includes("\\")) {
+    return undefined;
+  }
+
+  return base;
+}
+
+export function safeTelegramFilename(filename: string | undefined, fallbackFilename: string): string {
+  return safeTelegramFilenameCandidate(filename) ?? safeTelegramFilenameCandidate(fallbackFilename) ?? "attachment.bin";
 }
 
 export async function saveTelegramAttachment(input: SaveTelegramAttachmentInput): Promise<SavedTelegramAttachment> {
