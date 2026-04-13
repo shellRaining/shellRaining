@@ -7,6 +7,11 @@ import { isUserAllowed } from "./runtime/access-control.js";
 import { checkRateLimit } from "./runtime/rate-limiter.js";
 import { detectFiles, snapshotWorkspace } from "./runtime/artifact-detector.js";
 import { splitMessage } from "./runtime/message-splitter.js";
+import {
+  normalizeTelegramInput,
+  type NormalizedTelegramInput,
+  type TelegramInputMessage,
+} from "./runtime/telegram-input.js";
 import { configureWorkspaceState, formatPath, getWorkspace, setWorkspace } from "./runtime/workspace.js";
 import { PiRuntime } from "./pi/runtime.js";
 import { getThreadKeyFromId } from "./pi/session-store.js";
@@ -38,6 +43,10 @@ export function shouldFallbackToRawTelegramReply(error: unknown): boolean {
 
   const typedError = error as Error & { code?: string };
   return typedError.code === "VALIDATION_ERROR" && error.message.includes("can't parse entities");
+}
+
+export function isTelegramInputProcessable(input: NormalizedTelegramInput): boolean {
+  return input.isProcessable;
 }
 
 async function replyLong(thread: Thread, text: string): Promise<void> {
@@ -152,8 +161,19 @@ async function handleCommand(thread: Thread, messageText: string, config: Config
   }
 }
 
-async function handlePrompt(thread: Thread, messageText: string, config: Config, runtime: PiRuntime): Promise<void> {
+async function handlePrompt(thread: Thread, message: TelegramInputMessage, config: Config, runtime: PiRuntime): Promise<void> {
   const threadKey = getThreadKeyFromId(thread.id);
+  const normalized = await normalizeTelegramInput({
+    baseDir: config.baseDir,
+    message,
+    sttConfig: config.stt,
+    threadKey,
+  });
+  if (!isTelegramInputProcessable(normalized)) {
+    await thread.post("没有识别到可处理的 Telegram 输入。请发送文本、图片、文件、语音或贴纸。");
+    return;
+  }
+
   const allowed = checkRateLimit(Number.parseInt(thread.channelId.replace(/\D/g, "") || "0", 10), config.rateLimitCooldownMs);
   if (!allowed.allowed) {
     await thread.post(`请等待 ${Math.ceil((allowed.retryAfterMs || 0) / 1000)} 秒后再发送下一条消息。`);
@@ -164,7 +184,8 @@ async function handlePrompt(thread: Thread, messageText: string, config: Config,
   const beforeSnapshot = await snapshotWorkspace(workspace);
   await thread.startTyping();
 
-  const result = await runtime.prompt(threadKey, messageText, workspace, {
+  const result = await runtime.prompt(threadKey, normalized.text, workspace, {
+    images: normalized.images,
     onStatus: async (status) => {
       await thread.startTyping(status);
     },
@@ -214,7 +235,7 @@ export function createBot(config: Config): Chat {
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
     }
-    await handlePrompt(thread, message.text || "", config, runtime);
+    await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
   });
 
   bot.onNewMention(async (thread, message) => {
@@ -226,7 +247,7 @@ export function createBot(config: Config): Chat {
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
     }
-    await handlePrompt(thread, message.text || "", config, runtime);
+    await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
   });
 
   bot.onSubscribedMessage(async (thread, message) => {
@@ -237,7 +258,7 @@ export function createBot(config: Config): Chat {
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
     }
-    await handlePrompt(thread, message.text || "", config, runtime);
+    await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
   });
 
   return bot;
