@@ -107,7 +107,7 @@ export async function normalizeTelegramInput(
       savedFiles.push(saved);
 
       if (attachment.type === "image") {
-        const mimeType = attachment.mimeType || "application/octet-stream";
+        const mimeType = attachment.mimeType || "image/jpeg";
         if (mimeType.startsWith("image/")) {
           images.push({
             type: "image",

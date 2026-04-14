@@ -87,6 +87,39 @@ describe("telegram-input", () => {
     expect(result.savedFiles[0]?.filename).toBe("photo.png");
   });
 
+  it("treats Telegram photos without MIME as JPEG image input", async () => {
+    const { normalizeTelegramInput } =
+      await import("../src/runtime/telegram-input.js");
+
+    const result = await normalizeTelegramInput({
+      baseDir: tempRoot,
+      message: {
+        attachments: [
+          attachment({
+            data: Buffer.from("telegram-photo"),
+            name: "telegram-photo",
+            type: "image",
+          }),
+        ],
+        id: "m2a",
+        text: "",
+      },
+      sttConfig: {},
+      threadKey: "telegram__1",
+    });
+
+    expect(result.images).toEqual([
+      {
+        type: "image",
+        data: Buffer.from("telegram-photo").toString("base64"),
+        mimeType: "image/jpeg",
+      },
+    ]);
+    expect(result.text).toContain("[Telegram image:");
+    expect(result.warnings).toEqual([]);
+    expect(result.savedFiles[0]?.filename).toBe("telegram-photo");
+  });
+
   it("keeps image-typed attachments with non-image MIME as generic attachments", async () => {
     const { normalizeTelegramInput } =
       await import("../src/runtime/telegram-input.js");
