@@ -26,6 +26,25 @@ interface CachedSession {
   session: Awaited<ReturnType<typeof createAgentSession>>["session"];
 }
 
+interface AssistantErrorMessage {
+  errorMessage?: unknown;
+  role?: unknown;
+  stopReason?: unknown;
+}
+
+function getAssistantErrorMessage(event: AgentSessionEvent): string | undefined {
+  if (event.type !== "message_end" && event.type !== "turn_end") {
+    return undefined;
+  }
+
+  const message = event.message as AssistantErrorMessage;
+  if (message.role !== "assistant" || message.stopReason !== "error" || typeof message.errorMessage !== "string") {
+    return undefined;
+  }
+
+  return message.errorMessage.trim() || undefined;
+}
+
 export class PiRuntime {
   private readonly sessions = new Map<string, CachedSession>();
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
@@ -117,8 +136,14 @@ export class PiRuntime {
     const { session } = await this.getOrCreateSession(threadKey, cwd);
     let output = "";
     let toolOutput = "";
+    let assistantError: string | undefined;
 
     const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
+      const eventError = getAssistantErrorMessage(event);
+      if (eventError) {
+        assistantError = eventError;
+      }
+
       if (event.type === "message_update") {
         if (event.assistantMessageEvent.type === "text_delta") {
           output += event.assistantMessageEvent.delta;
@@ -147,8 +172,17 @@ export class PiRuntime {
 
     try {
       await session.prompt(text, callbacks.images?.length ? { images: callbacks.images } : undefined);
+      const artifactsOutput = `${output}\n${toolOutput}`.trim();
+      if (assistantError) {
+        return {
+          artifactsOutput,
+          error: assistantError,
+          text: output,
+        };
+      }
+
       return {
-        artifactsOutput: `${output}\n${toolOutput}`.trim(),
+        artifactsOutput,
         text: output || "(no output)",
       };
     } catch (error) {

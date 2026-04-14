@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+type SessionListener = (event: unknown) => void;
+
 const sessionPrompt = vi.fn();
-const sessionSubscribe = vi.fn(() => () => undefined);
+const sessionSubscribe = vi.fn((_listener: SessionListener) => () => undefined);
 const sessionDispose = vi.fn();
 const sessionNewSession = vi.fn();
 const sessionManagerContinueRecent = vi.fn(() => ({ mode: "recent" }));
@@ -90,5 +92,33 @@ describe("PiRuntime", () => {
     expect(createAgentSession).toHaveBeenCalledTimes(2);
     expect(sessionManagerContinueRecent).toHaveBeenCalledTimes(1);
     expect(sessionManagerCreate).toHaveBeenCalledWith("/mock/workspace", "/mock/base/sessions/telegram__1");
+  });
+
+  it("returns assistant message errors emitted by Pi", async () => {
+    const errorMessage = "429 已达到 5 小时的使用上限。";
+    sessionSubscribe.mockImplementation((listener: SessionListener) => {
+      sessionPrompt.mockImplementation(async () => {
+        listener({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            content: [],
+            stopReason: "error",
+            errorMessage,
+          },
+        });
+      });
+      return () => undefined;
+    });
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    const result = await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+
+    expect(result).toEqual({
+      artifactsOutput: "",
+      error: errorMessage,
+      text: "",
+    });
   });
 });
