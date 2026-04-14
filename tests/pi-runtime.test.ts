@@ -1,8 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sessionPrompt = vi.fn();
 const sessionSubscribe = vi.fn(() => () => undefined);
 const sessionDispose = vi.fn();
+const sessionNewSession = vi.fn();
+const sessionManagerContinueRecent = vi.fn(() => ({ mode: "recent" }));
+const sessionManagerCreate = vi.fn(() => ({ mode: "new" }));
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(async () => undefined),
@@ -13,7 +16,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
     session: {
       dispose: sessionDispose,
       listSessions: vi.fn(),
-      newSession: vi.fn(),
+      newSession: sessionNewSession,
       prompt: sessionPrompt,
       subscribe: sessionSubscribe,
       switchSession: vi.fn(),
@@ -23,33 +26,46 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
     reload = vi.fn();
   },
   SessionManager: {
-    continueRecent: vi.fn(() => ({})),
+    continueRecent: sessionManagerContinueRecent,
+    create: sessionManagerCreate,
     list: vi.fn(() => []),
   },
 }));
 
+function createRuntimeConfig() {
+  return {
+    agentDir: "/mock/agent",
+    allowedUsers: [],
+    baseDir: "/mock/base",
+    port: 1234,
+    rateLimitCooldownMs: 0,
+    serviceProfile: {
+      apiBaseUrl: "https://api.shellraining.xyz",
+      crawlUrl: "https://crawl.shellraining.xyz",
+      vikunjaUrl: "https://todo.shellraining.xyz",
+    },
+    showThinking: false,
+    skillsDir: "/mock/skills",
+    stt: {},
+    telegramToken: "token",
+    workspace: "/mock/workspace",
+  };
+}
+
 describe("PiRuntime", () => {
-  it("passes image inputs to the Pi session prompt", async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
     sessionPrompt.mockResolvedValue(undefined);
+    sessionSubscribe.mockReturnValue(() => undefined);
+    sessionNewSession.mockResolvedValue(true);
+    sessionManagerContinueRecent.mockReturnValue({ mode: "recent" });
+    sessionManagerCreate.mockReturnValue({ mode: "new" });
+  });
+
+  it("passes image inputs to the Pi session prompt", async () => {
     const { PiRuntime } = await import("../src/pi/runtime.js");
 
-    const runtime = new PiRuntime({
-      agentDir: "/mock/agent",
-      allowedUsers: [],
-      baseDir: "/mock/base",
-      port: 1234,
-      rateLimitCooldownMs: 0,
-      serviceProfile: {
-        apiBaseUrl: "https://api.shellraining.xyz",
-        crawlUrl: "https://crawl.shellraining.xyz",
-        vikunjaUrl: "https://todo.shellraining.xyz",
-      },
-      showThinking: false,
-      skillsDir: "/mock/skills",
-      stt: {},
-      telegramToken: "token",
-      workspace: "/mock/workspace",
-    });
+    const runtime = new PiRuntime(createRuntimeConfig());
 
     await runtime.prompt("telegram__1", "describe this", "/mock/workspace", {
       images: [{ type: "image", data: "abc", mimeType: "image/png" }],
@@ -58,5 +74,21 @@ describe("PiRuntime", () => {
     expect(sessionPrompt).toHaveBeenCalledWith("describe this", {
       images: [{ type: "image", data: "abc", mimeType: "image/png" }],
     });
+  });
+
+  it("starts a fresh Pi SDK session manager after starting a new session", async () => {
+    const { createAgentSession } = await import("@mariozechner/pi-coding-agent");
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+    await runtime.newSession("telegram__1", "/mock/workspace");
+    await runtime.prompt("telegram__1", "hello again", "/mock/workspace");
+
+    expect(sessionNewSession).not.toHaveBeenCalled();
+    expect(sessionDispose).toHaveBeenCalledTimes(1);
+    expect(createAgentSession).toHaveBeenCalledTimes(2);
+    expect(sessionManagerContinueRecent).toHaveBeenCalledTimes(1);
+    expect(sessionManagerCreate).toHaveBeenCalledWith("/mock/workspace", "/mock/base/sessions/telegram__1");
   });
 });

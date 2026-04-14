@@ -32,17 +32,7 @@ export class PiRuntime {
 
   constructor(private readonly config: Config) {}
 
-  private async getOrCreateSession(threadKey: string, cwd: string): Promise<CachedSession> {
-    const existing = this.sessions.get(threadKey);
-    if (existing && existing.cwd === cwd) {
-      return existing;
-    }
-
-    if (existing && existing.cwd !== cwd) {
-      existing.session.dispose();
-      this.sessions.delete(threadKey);
-    }
-
+  private async createSession(threadKey: string, cwd: string, mode: "continue" | "new"): Promise<CachedSession> {
     const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
     await mkdir(sessionDir, { recursive: true });
 
@@ -60,7 +50,7 @@ export class PiRuntime {
       cwd,
       agentDir: this.config.agentDir,
       resourceLoader,
-      sessionManager: SessionManager.continueRecent(cwd, sessionDir),
+      sessionManager: mode === "new" ? SessionManager.create(cwd, sessionDir) : SessionManager.continueRecent(cwd, sessionDir),
     });
 
     const cached = { cwd, session };
@@ -68,9 +58,28 @@ export class PiRuntime {
     return cached;
   }
 
+  private async getOrCreateSession(threadKey: string, cwd: string): Promise<CachedSession> {
+    const existing = this.sessions.get(threadKey);
+    if (existing && existing.cwd === cwd) {
+      return existing;
+    }
+
+    if (existing && existing.cwd !== cwd) {
+      existing.session.dispose();
+      this.sessions.delete(threadKey);
+    }
+
+    return this.createSession(threadKey, cwd, "continue");
+  }
+
   async newSession(threadKey: string, cwd: string): Promise<void> {
-    const { session } = await this.getOrCreateSession(threadKey, cwd);
-    await session.newSession();
+    const existing = this.sessions.get(threadKey);
+    if (existing) {
+      existing.session.dispose();
+      this.sessions.delete(threadKey);
+    }
+
+    await this.createSession(threadKey, cwd, "new");
   }
 
   async listSessions(threadKey: string, cwd: string): Promise<SessionInfo[]> {
