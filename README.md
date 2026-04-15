@@ -25,6 +25,8 @@ Telegram input support:
 - Telegram document attachments such as TXT, PDF, and XLSX are downloaded and sent to Pi as local absolute file paths. shellRaining does not parse document contents itself.
 - Telegram voice/audio attachments are downloaded and sent as local absolute file paths. When STT is configured, the transcript is included in the prompt.
 - Telegram stickers are represented as lightweight text using their sticker emoji when Telegram provides one.
+- shellRaining does not apply an internal attachment size cap. With Telegram's cloud Bot API, `getFile` can only download files up to 20 MB; for larger Telegram files, run a local Bot API server and set `TELEGRAM_API_BASE_URL`.
+- When the local Bot API server runs in Docker, set `TELEGRAM_LOCAL_FILE_SERVER_ROOT=/var/lib/telegram-bot-api` and `TELEGRAM_LOCAL_FILE_HOST_ROOT` to the host bind mount so container file paths can be read by shellRaining.
 
 Optional STT configuration:
 

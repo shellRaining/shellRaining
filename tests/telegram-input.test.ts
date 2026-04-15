@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let tempRoot: string;
 
 function attachment(
-  input: Partial<Attachment> & { data: Buffer; type: Attachment["type"] },
+  input: Partial<Attachment> & { type: Attachment["type"] },
 ): Attachment {
   return {
     data: input.data,
@@ -177,6 +177,38 @@ describe("telegram-input", () => {
     expect(result.text).toContain("report.pdf (application/pdf):");
     expect(result.text).not.toContain("not parsed");
     expect(result.images).toEqual([]);
+  });
+
+  it("explains Telegram oversized download failures without implying an internal limit", async () => {
+    const { normalizeTelegramInput } =
+      await import("../src/runtime/telegram-input.js");
+
+    const result = await normalizeTelegramInput({
+      baseDir: tempRoot,
+      message: {
+        attachments: [
+          attachment({
+            fetchData: async () => {
+              throw new Error("Bad Request: file is too big");
+            },
+            mimeType: "application/pdf",
+            name: "large.pdf",
+            size: 25 * 1024 * 1024,
+            type: "file",
+          }),
+        ],
+        id: "m3a",
+        text: "how many pages?",
+      },
+      sttConfig: {},
+      threadKey: "telegram__1",
+    });
+
+    expect(result.savedFiles).toEqual([]);
+    expect(result.text).toContain("[Telegram input warnings]");
+    expect(result.warnings).toEqual([
+      "Telegram refused to download attachment large.pdf (25.0 MB): Bad Request: file is too big. This is a Telegram Bot API download limit, not a shellRaining internal file size limit.",
+    ]);
   });
 
   it("adds STT transcript for audio when the transcriber succeeds", async () => {

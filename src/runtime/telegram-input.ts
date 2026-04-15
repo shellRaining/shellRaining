@@ -53,6 +53,43 @@ function fallbackFilename(type: Attachment["type"], index: number): string {
   return `telegram-${type}-${index + 1}.bin`;
 }
 
+function formatAttachmentSize(size: number | undefined): string | undefined {
+  if (typeof size !== "number" || !Number.isFinite(size) || size < 0) {
+    return undefined;
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  let value = size;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+
+  return unitIndex === 0
+    ? `${value} ${units[unitIndex]}`
+    : `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function formatAttachmentProcessingFailure(
+  attachment: Attachment,
+  index: number,
+  message: string,
+): string {
+  const label = attachment.name || String(index + 1);
+  if (/file is too big/i.test(message)) {
+    const size = formatAttachmentSize(attachment.size);
+    const sizeSuffix = size ? ` (${size})` : "";
+    return [
+      `Telegram refused to download attachment ${label}${sizeSuffix}: ${message}.`,
+      "This is a Telegram Bot API download limit, not a shellRaining internal file size limit.",
+    ].join(" ");
+  }
+
+  return `Failed to process attachment ${label}: ${message}`;
+}
+
 async function loadAttachmentData(attachment: Attachment): Promise<Buffer> {
   if (Buffer.isBuffer(attachment.data)) {
     return attachment.data;
@@ -154,7 +191,7 @@ export async function normalizeTelegramInput(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       warnings.push(
-        `Failed to process attachment ${attachment.name || index + 1}: ${message}`,
+        formatAttachmentProcessingFailure(attachment, index, message),
       );
     }
   }

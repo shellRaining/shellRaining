@@ -49,6 +49,21 @@ export function isTelegramInputProcessable(input: NormalizedTelegramInput): bool
   return input.isProcessable;
 }
 
+export function formatTelegramStatusMessage(input: {
+  skillsDir: string;
+  telegramApiBaseUrl?: string;
+  threadId: string;
+  workspace: string;
+}): string {
+  const telegramApi = input.telegramApiBaseUrl || "https://api.telegram.org";
+  return [
+    `thread=${input.threadId}`,
+    `workspace=${formatPath(input.workspace)}`,
+    `skills=${input.skillsDir}`,
+    `telegramApi=${telegramApi}`,
+  ].join("\n");
+}
+
 export function hasPotentialTelegramInput(message: TelegramInputMessage): boolean {
   return Boolean(
     message.text?.trim() ||
@@ -162,7 +177,12 @@ async function handleCommand(thread: Thread, messageText: string, config: Config
       return true;
     }
     case "status":
-      await thread.post(`thread=${thread.id}\nworkspace=${formatPath(currentWorkspace)}\nskills=${config.skillsDir}`);
+      await thread.post(formatTelegramStatusMessage({
+        skillsDir: config.skillsDir,
+        telegramApiBaseUrl: config.telegramApiBaseUrl,
+        threadId: thread.id,
+        workspace: currentWorkspace,
+      }));
       return true;
     default:
       return false;
@@ -230,6 +250,7 @@ export function createBot(config: Config): Chat {
     concurrency: TELEGRAM_CONCURRENCY,
     adapters: {
       telegram: createTelegramAdapter({
+        apiBaseUrl: config.telegramApiBaseUrl,
         botToken: config.telegramToken,
         secretToken: config.telegramWebhookSecret,
         mode: "webhook",

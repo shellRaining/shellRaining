@@ -56,4 +56,14 @@ describe("config", () => {
       model: "faster-whisper-large-v3",
     });
   });
+
+  it("parses optional Telegram API base URL", async () => {
+    process.env.TELEGRAM_BOT_TOKEN = "test-token";
+    process.env.TELEGRAM_API_BASE_URL = " http://127.0.0.1:8081/ ";
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = loadConfig();
+
+    expect(config.telegramApiBaseUrl).toBe("http://127.0.0.1:8081");
+  });
 });

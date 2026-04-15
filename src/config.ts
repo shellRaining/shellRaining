@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 export interface Config {
   telegramToken: string;
+  telegramApiBaseUrl?: string;
   telegramWebhookSecret?: string;
   port: number;
   baseDir: string;
@@ -66,6 +67,9 @@ export function loadConfig(): Config {
 
   return {
     telegramToken: token,
+    telegramApiBaseUrl: process.env.TELEGRAM_API_BASE_URL?.trim()
+      ? trimTrailingSlashes(process.env.TELEGRAM_API_BASE_URL.trim())
+      : undefined,
     telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET?.trim() || undefined,
     port: Number.parseInt(process.env.SHELL_RAINING_PORT || "3457", 10),
     baseDir,

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { hasPotentialTelegramInput, isTelegramInputProcessable } from "../src/bot.js";
+import {
+  formatTelegramStatusMessage,
+  hasPotentialTelegramInput,
+  isTelegramInputProcessable,
+} from "../src/bot.js";
 
 describe("bot telegram input routing", () => {
   it("treats whitespace-only messages with no attachment or sticker as lacking potential input", () => {
@@ -55,5 +59,14 @@ describe("bot telegram input routing", () => {
       text: "",
       warnings: [],
     })).toBe(false);
+  });
+
+  it("includes the configured Telegram API endpoint in status output", () => {
+    expect(formatTelegramStatusMessage({
+      skillsDir: "/skills",
+      telegramApiBaseUrl: "http://127.0.0.1:8090",
+      threadId: "telegram:1",
+      workspace: "/workspace",
+    })).toContain("telegramApi=http://127.0.0.1:8090");
   });
 });
