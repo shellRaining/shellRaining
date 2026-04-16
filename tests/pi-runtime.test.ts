@@ -39,6 +39,11 @@ function createRuntimeConfig() {
     agentDir: "/mock/agent",
     allowedUsers: [],
     baseDir: "/mock/base",
+    cron: {
+      jobsPath: "/mock/base/cron/jobs.json",
+      misfireGraceMs: 5 * 60 * 1000,
+      runTimeoutMs: 5 * 60 * 1000,
+    },
     port: 1234,
     rateLimitCooldownMs: 0,
     serviceProfile: {
