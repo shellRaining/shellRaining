@@ -80,6 +80,12 @@ export class PiRuntime {
       sessionManager: mode === "new" ? SessionManager.create(cwd, sessionDir) : SessionManager.continueRecent(cwd, sessionDir),
     });
 
+    if (this.config.providerBaseUrl) {
+      session.modelRegistry.registerProvider("shellraining", {
+        baseUrl: this.config.providerBaseUrl,
+      });
+    }
+
     const cached = { cwd, session };
     this.sessions.set(threadKey, cached);
     return cached;

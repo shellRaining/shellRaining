@@ -28,6 +28,7 @@ export interface Config {
     vikunjaUrl: string;
     apiBaseUrl: string;
   };
+  providerBaseUrl?: string;
 }
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
@@ -110,5 +111,8 @@ export function loadConfig(): Config {
       vikunjaUrl: process.env.SHELL_RAINING_VIKUNJA_URL?.trim() || "https://todo.shellraining.xyz",
       apiBaseUrl: process.env.SHELL_RAINING_API_BASE_URL?.trim() || "https://api.shellraining.xyz",
     },
+    providerBaseUrl: process.env.SHELL_RAINING_PROVIDER_BASE_URL?.trim()
+      ? trimTrailingSlashes(process.env.SHELL_RAINING_PROVIDER_BASE_URL.trim())
+      : undefined,
   };
 }
