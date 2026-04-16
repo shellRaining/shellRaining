@@ -231,7 +231,7 @@ describe("CronService", () => {
 
     expect(workspaceForThreadKey).toHaveBeenCalledWith("telegram__42");
     expect(runtimePrompt).toHaveBeenCalledWith("telegram__42", "Send the daily summary", "/mock/workspace");
-    expect(deliver).toHaveBeenCalledWith(42, "(no output)");
+    expect(deliver).toHaveBeenCalledWith("telegram:42", "(no output)");
     expect(store.snapshot()).toEqual([]);
   });
 
@@ -360,7 +360,7 @@ describe("CronService", () => {
 
     expect(runtimePrompt).toHaveBeenCalledTimes(1);
     expect(runtimePrompt).toHaveBeenCalledWith("telegram__42", "Send the daily summary", "/mock/workspace");
-    expect(deliver).toHaveBeenCalledWith(42, "done");
+    expect(deliver).toHaveBeenCalledWith("telegram:42", "done");
     expect(store.snapshot()).toEqual([
       expect.objectContaining({
         id: "due-now",

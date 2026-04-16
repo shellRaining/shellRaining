@@ -14,7 +14,7 @@ export interface CronServiceRuntime {
 export interface CronServiceDeps {
   store: CronServiceStore;
   runtime: CronServiceRuntime;
-  deliver: (chatId: number, text: string) => Promise<void>;
+  deliver: (threadId: string, text: string) => Promise<void>;
   workspaceForThreadKey: (threadKey: string) => Promise<string> | string;
   now: () => number;
   setTimeoutFn: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
@@ -149,7 +149,7 @@ export class CronService {
         },
       };
 
-      await this.deps.deliver(job.chatId, result.text || "(no output)");
+      await this.deps.deliver(job.threadId, result.text || "(no output)");
 
       if (job.deleteAfterRun) {
         await this.deps.store.save({

@@ -36,6 +36,14 @@ export const TELEGRAM_CONCURRENCY = {
   debounceMs: 1200,
 } as const;
 
+export interface BotRuntime {
+  chat: Chat;
+  runtime: PiRuntime;
+  telegram: {
+    postCronMessage(threadId: string, text: string): Promise<void>;
+  };
+}
+
 export function shouldFallbackToRawTelegramReply(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
@@ -242,25 +250,25 @@ async function handlePrompt(thread: Thread, message: TelegramInputMessage, confi
   }
 }
 
-export function createBot(config: Config): Chat {
+export function createBot(config: Config, runtime = new PiRuntime(config)): BotRuntime {
   configureWorkspaceState(config.baseDir);
-  const runtime = new PiRuntime(config);
-  const bot = new Chat({
+  const telegram = createTelegramAdapter({
+    apiBaseUrl: config.telegramApiBaseUrl,
+    botToken: config.telegramToken,
+    secretToken: config.telegramWebhookSecret,
+    mode: "webhook",
+  });
+  const chat = new Chat({
     userName: "shellRaining_bot",
     concurrency: TELEGRAM_CONCURRENCY,
     adapters: {
-      telegram: createTelegramAdapter({
-        apiBaseUrl: config.telegramApiBaseUrl,
-        botToken: config.telegramToken,
-        secretToken: config.telegramWebhookSecret,
-        mode: "webhook",
-      }),
+      telegram,
     },
     logger: "info",
     state: createMemoryState(),
   });
 
-  bot.onDirectMessage(async (thread, message) => {
+  chat.onDirectMessage(async (thread, message) => {
     if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;
@@ -272,7 +280,7 @@ export function createBot(config: Config): Chat {
     await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
   });
 
-  bot.onNewMention(async (thread, message) => {
+  chat.onNewMention(async (thread, message) => {
     if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;
@@ -284,7 +292,7 @@ export function createBot(config: Config): Chat {
     await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
   });
 
-  bot.onSubscribedMessage(async (thread, message) => {
+  chat.onSubscribedMessage(async (thread, message) => {
     if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;
@@ -295,5 +303,20 @@ export function createBot(config: Config): Chat {
     await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
   });
 
-  return bot;
+  return {
+    chat,
+    runtime,
+    telegram: {
+      async postCronMessage(threadId: string, text: string): Promise<void> {
+        try {
+          await telegram.postMessage(threadId, toTelegramReplyMessage(text));
+        } catch (error) {
+          if (!shouldFallbackToRawTelegramReply(error)) {
+            throw error;
+          }
+          await telegram.postMessage(threadId, text);
+        }
+      },
+    },
+  };
 }
