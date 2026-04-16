@@ -31,6 +31,46 @@ describe("config", () => {
     expect(config.agentDir).toBe("/mock/home/.pi/agent");
   });
 
+  it("loads cron storage and timeout defaults", async () => {
+    process.env.TELEGRAM_BOT_TOKEN = "token";
+    delete process.env.SHELL_RAINING_CRON_JOBS_PATH;
+    delete process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS;
+    delete process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS;
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = loadConfig();
+
+    expect(config.cron.jobsPath).toContain(".shellRaining/cron/jobs.json");
+    expect(config.cron.runTimeoutMs).toBe(5 * 60 * 1000);
+    expect(config.cron.misfireGraceMs).toBe(5 * 60 * 1000);
+  });
+
+  it("uses explicit cron config overrides", async () => {
+    process.env.TELEGRAM_BOT_TOKEN = "token";
+    process.env.SHELL_RAINING_CRON_JOBS_PATH = " /tmp/custom-cron/jobs.json ";
+    process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS = " 120000 ";
+    process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS = " 45000 ";
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = loadConfig();
+
+    expect(config.cron.jobsPath).toBe("/tmp/custom-cron/jobs.json");
+    expect(config.cron.runTimeoutMs).toBe(120000);
+    expect(config.cron.misfireGraceMs).toBe(45000);
+  });
+
+  it("falls back to cron numeric defaults for invalid values", async () => {
+    process.env.TELEGRAM_BOT_TOKEN = "token";
+    process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS = "not-a-number";
+    process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS = "   ";
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = loadConfig();
+
+    expect(config.cron.runTimeoutMs).toBe(5 * 60 * 1000);
+    expect(config.cron.misfireGraceMs).toBe(5 * 60 * 1000);
+  });
+
   it("parses allowed users and custom rate limit", async () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
     process.env.SHELL_RAINING_ALLOWED_USERS = "123,456";

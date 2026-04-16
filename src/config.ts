@@ -13,6 +13,11 @@ export interface Config {
   allowedUsers: number[];
   rateLimitCooldownMs: number;
   showThinking: boolean;
+  cron: {
+    jobsPath: string;
+    runTimeoutMs: number;
+    misfireGraceMs: number;
+  };
   stt: {
     apiKey?: string;
     baseUrl?: string;
@@ -48,6 +53,15 @@ function trimTrailingSlashes(value: string): string {
   return value.slice(0, end);
 }
 
+function parseCronNumber(value: string | undefined, defaultValue: number): number {
+  if (!value) {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(value.trim(), 10);
+  return Number.isNaN(parsed) ? defaultValue : parsed;
+}
+
 export function loadConfig(): Config {
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!token) {
@@ -79,6 +93,11 @@ export function loadConfig(): Config {
     allowedUsers,
     rateLimitCooldownMs: Number.parseInt(process.env.SHELL_RAINING_RATE_LIMIT_COOLDOWN_MS || "5000", 10),
     showThinking: parseBoolean(process.env.SHELL_RAINING_SHOW_THINKING, false),
+    cron: {
+      jobsPath: process.env.SHELL_RAINING_CRON_JOBS_PATH?.trim() || join(baseDir, "cron", "jobs.json"),
+      runTimeoutMs: parseCronNumber(process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS, 5 * 60 * 1000),
+      misfireGraceMs: parseCronNumber(process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS, 5 * 60 * 1000),
+    },
     stt: {
       apiKey: process.env.SHELL_RAINING_STT_API_KEY?.trim() || undefined,
       baseUrl: process.env.SHELL_RAINING_STT_BASE_URL?.trim()

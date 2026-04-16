@@ -18,9 +18,12 @@
     "@chat-adapter/telegram": "link:../chat-telegramify/packages/adapter-telegram",
     "@hono/node-server": "^1.14.1",
     "@mariozechner/pi-coding-agent": "^0.62.0",
+    "@sinclair/typebox": "^0.34.41",
     "chat": "link:../chat-telegramify/packages/chat",
+    "croner": "^9.1.0",
     "dotenv": "^16.6.1",
     "hono": "^4.12.5",
+    "nanoid": "^5.1.5",
     "telegramify": "link:../chat-telegramify/packages/telegramify",
     "undici": "^7.16.0"
   },
