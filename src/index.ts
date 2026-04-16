@@ -7,6 +7,7 @@ import { CronService } from "./cron/service.js";
 import { CronStore } from "./cron/store.js";
 import { buildCronExtensionFactory } from "./cron/tools.js";
 import { PiRuntime } from "./pi/runtime.js";
+import { getThreadIdFromKey, getChatIdFromThreadKey } from "./pi/session-store.js";
 import { syncPiSettings } from "./runtime/pi-settings.js";
 import { getWorkspace } from "./runtime/workspace.js";
 
@@ -43,7 +44,11 @@ const cronService = new CronService({
   misfireGraceMs: config.cron.misfireGraceMs,
 });
 runtime = new PiRuntime(config, {
-  extensionFactories: [buildCronExtensionFactory(cronService)],
+  extensionFactories: (threadKey) => {
+    const threadId = getThreadIdFromKey(threadKey);
+    const chatId = getChatIdFromThreadKey(threadKey);
+    return [buildCronExtensionFactory(cronService, { chatId, threadId, threadKey })];
+  },
 });
 const botRuntime = createBot(config, runtime);
 await cronService.start();

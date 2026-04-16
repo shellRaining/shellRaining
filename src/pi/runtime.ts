@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { createAgentSession, DefaultResourceLoader, SessionManager, type AgentSessionEvent, type ExtensionFactory, type SessionInfo } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
-import { getSessionDirectoryForThread } from "./session-store.js";
+import { getSessionDirectoryForThread, getChatIdFromThreadKey, getThreadIdFromKey } from "./session-store.js";
 import { buildServiceProfileContext, createServiceProfile } from "../runtime/service-profile.js";
 
 export interface PiPromptResult {
@@ -22,7 +22,7 @@ export interface PiPromptCallbacks {
 }
 
 interface PiRuntimeOptions {
-  extensionFactories?: ExtensionFactory[];
+  extensionFactories?: (threadKey: string) => ExtensionFactory[];
 }
 
 interface CachedSession {
@@ -65,7 +65,7 @@ export class PiRuntime {
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir: this.config.agentDir,
-      extensionFactories: this.options.extensionFactories,
+      extensionFactories: this.options.extensionFactories?.(threadKey),
       appendSystemPromptOverride: (base) => [
         ...base,
         buildServiceProfileContext(createServiceProfile(this.config)),

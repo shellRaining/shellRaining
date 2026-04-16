@@ -32,17 +32,20 @@ function formatJob(job: CronJob): string {
   ].join("\n");
 }
 
-export function buildCronExtensionFactory(service: CronService): ExtensionFactory {
+export interface ThreadContext {
+  chatId: number;
+  threadId: string;
+  threadKey: string;
+}
+
+export function buildCronExtensionFactory(service: CronService, thread: ThreadContext): ExtensionFactory {
   return async (pi: ExtensionAPI) => {
     pi.registerTool({
       name: "cron_create",
       label: "Create cron job",
-      description: "Create a scheduled cron job for a chat thread.",
+      description: "Create a scheduled cron job for the current chat thread.",
       parameters: Type.Object({
         name: Type.String({ minLength: 1 }),
-        chatId: Type.Integer(),
-        threadId: Type.String({ minLength: 1 }),
-        threadKey: Type.String({ minLength: 1 }),
         schedule: Type.Union([
           Type.Object({ kind: Type.Literal("at"), at: Type.String({ minLength: 1 }) }),
           Type.Object({ kind: Type.Literal("every"), everyMs: Type.Integer({ minimum: 1 }), anchorMs: Type.Optional(Type.Integer()) }),
@@ -54,7 +57,12 @@ export function buildCronExtensionFactory(service: CronService): ExtensionFactor
         }),
       }),
       async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-        const job = await service.add(normalizeCronJobInput(params as CronJobInput));
+        const job = await service.add(normalizeCronJobInput({
+          ...params,
+          chatId: thread.chatId,
+          threadId: thread.threadId,
+          threadKey: thread.threadKey,
+        } as CronJobInput));
         return textResult(`已创建定时任务：${job.name}（${job.id}）`);
       },
     });
@@ -62,12 +70,10 @@ export function buildCronExtensionFactory(service: CronService): ExtensionFactor
     pi.registerTool({
       name: "cron_list",
       label: "List cron jobs",
-      description: "List scheduled cron jobs for a chat.",
-      parameters: Type.Object({
-        chatId: Type.Integer(),
-      }),
-      async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-        const jobs = (await service.listJobs()).filter((job) => job.chatId === params.chatId);
+      description: "List scheduled cron jobs for the current chat.",
+      parameters: Type.Object({}),
+      async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
+        const jobs = (await service.listJobs()).filter((job) => job.chatId === thread.chatId);
         if (jobs.length === 0) {
           return textResult("当前聊天没有定时任务。");
         }

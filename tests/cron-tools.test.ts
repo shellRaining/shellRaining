@@ -42,7 +42,9 @@ function getRegisteredTool(registerTool: ReturnType<typeof vi.fn>, name: string)
 }
 
 describe("buildCronExtensionFactory", () => {
-  it("creates jobs through cron_create", async () => {
+  const thread = { chatId: 1, threadId: "telegram:1", threadKey: "telegram__1" };
+
+  it("creates jobs through cron_create without explicit thread params", async () => {
     const { buildCronExtensionFactory } = await import("../src/cron/tools.js");
     const service = {
       add: vi.fn(async (job: CronJob) => job),
@@ -51,14 +53,11 @@ describe("buildCronExtensionFactory", () => {
     };
     const registerTool = vi.fn();
 
-    await buildCronExtensionFactory(service as any)(createExtensionApi(registerTool));
+    await buildCronExtensionFactory(service as any, thread)(createExtensionApi(registerTool));
 
     const tool = getRegisteredTool(registerTool, "cron_create");
     const result = await tool.execute("tool_1", {
       name: "新闻总结",
-      chatId: 1,
-      threadId: "telegram:1",
-      threadKey: "telegram__1",
       schedule: { kind: "every", everyMs: 60_000 },
       payload: { kind: "agentTurn", message: "总结新闻" },
     });
@@ -76,7 +75,7 @@ describe("buildCronExtensionFactory", () => {
     expect(result.content[0]?.text).toContain("已创建定时任务：新闻总结");
   });
 
-  it("lists jobs filtered by chat id", async () => {
+  it("lists jobs filtered by chat id from thread context", async () => {
     const { buildCronExtensionFactory } = await import("../src/cron/tools.js");
     const service = {
       add: vi.fn(),
@@ -88,10 +87,10 @@ describe("buildCronExtensionFactory", () => {
     };
     const registerTool = vi.fn();
 
-    await buildCronExtensionFactory(service as any)(createExtensionApi(registerTool));
+    await buildCronExtensionFactory(service as any, thread)(createExtensionApi(registerTool));
 
     const tool = getRegisteredTool(registerTool, "cron_list");
-    const result = await tool.execute("tool_2", { chatId: 1 });
+    const result = await tool.execute("tool_2", {});
 
     expect(service.listJobs).toHaveBeenCalled();
     expect(result.content[0]?.text).toContain("新闻总结（job_chat_1）");
@@ -107,7 +106,7 @@ describe("buildCronExtensionFactory", () => {
     };
     const registerTool = vi.fn();
 
-    await buildCronExtensionFactory(service as any)(createExtensionApi(registerTool));
+    await buildCronExtensionFactory(service as any, thread)(createExtensionApi(registerTool));
 
     const tool = getRegisteredTool(registerTool, "cron_remove");
     const result = await tool.execute("tool_3", { id: "job_123" });

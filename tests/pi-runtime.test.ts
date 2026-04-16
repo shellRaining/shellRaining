@@ -74,15 +74,17 @@ describe("PiRuntime", () => {
     resourceLoaderReload.mockResolvedValue(undefined);
   });
 
-  it("passes extension factories into the Pi resource loader", async () => {
+  it("passes extension factories from builder into the Pi resource loader", async () => {
     const extensionFactory = vi.fn(async () => undefined);
+    const builder = vi.fn((_threadKey: string) => [extensionFactory]);
     const { PiRuntime } = await import("../src/pi/runtime.js");
     const runtime = new PiRuntime(createRuntimeConfig(), {
-      extensionFactories: [extensionFactory],
+      extensionFactories: builder,
     });
 
     await runtime.prompt("telegram__1", "hello", "/mock/workspace");
 
+    expect(builder).toHaveBeenCalledWith("telegram__1");
     expect(defaultResourceLoader).toHaveBeenCalledWith(
       expect.objectContaining({ extensionFactories: [extensionFactory] }),
     );
