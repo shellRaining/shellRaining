@@ -1,0 +1,92 @@
+import { Type } from "@sinclair/typebox";
+import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
+import type { CronService } from "./service.js";
+import { normalizeCronJobInput, type CronJobInput } from "./normalize.js";
+import type { CronJob } from "./types.js";
+
+function textResult(text: string): AgentToolResult<{ text: string }> {
+  return {
+    content: [{ type: "text" as const, text }],
+    details: { text },
+  };
+}
+
+function formatSchedule(job: CronJob): string {
+  if (job.schedule.kind === "at") {
+    return `at ${job.schedule.at}`;
+  }
+
+  if (job.schedule.kind === "every") {
+    return `every ${job.schedule.everyMs}ms`;
+  }
+
+  return job.schedule.tz ? `${job.schedule.expr} (${job.schedule.tz})` : job.schedule.expr;
+}
+
+function formatJob(job: CronJob): string {
+  return [
+    `${job.name}（${job.id}）`,
+    `schedule: ${formatSchedule(job)}`,
+    `thread: ${job.threadId}`,
+    `enabled: ${job.enabled ? "yes" : "no"}`,
+  ].join("\n");
+}
+
+export function buildCronExtensionFactory(service: CronService): ExtensionFactory {
+  return async (pi: ExtensionAPI) => {
+    pi.registerTool({
+      name: "cron_create",
+      label: "Create cron job",
+      description: "Create a scheduled cron job for a chat thread.",
+      parameters: Type.Object({
+        name: Type.String({ minLength: 1 }),
+        chatId: Type.Integer(),
+        threadId: Type.String({ minLength: 1 }),
+        threadKey: Type.String({ minLength: 1 }),
+        schedule: Type.Union([
+          Type.Object({ kind: Type.Literal("at"), at: Type.String({ minLength: 1 }) }),
+          Type.Object({ kind: Type.Literal("every"), everyMs: Type.Integer({ minimum: 1 }), anchorMs: Type.Optional(Type.Integer()) }),
+          Type.Object({ kind: Type.Literal("cron"), expr: Type.String({ minLength: 1 }), tz: Type.Optional(Type.String()) }),
+        ]),
+        payload: Type.Object({
+          kind: Type.Literal("agentTurn"),
+          message: Type.String({ minLength: 1 }),
+        }),
+      }),
+      async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+        const job = await service.add(normalizeCronJobInput(params as CronJobInput));
+        return textResult(`已创建定时任务：${job.name}（${job.id}）`);
+      },
+    });
+
+    pi.registerTool({
+      name: "cron_list",
+      label: "List cron jobs",
+      description: "List scheduled cron jobs for a chat.",
+      parameters: Type.Object({
+        chatId: Type.Integer(),
+      }),
+      async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+        const jobs = (await service.listJobs()).filter((job) => job.chatId === params.chatId);
+        if (jobs.length === 0) {
+          return textResult("当前聊天没有定时任务。");
+        }
+
+        return textResult(jobs.map(formatJob).join("\n\n"));
+      },
+    });
+
+    pi.registerTool({
+      name: "cron_remove",
+      label: "Remove cron job",
+      description: "Remove a scheduled cron job by id.",
+      parameters: Type.Object({
+        id: Type.String({ minLength: 1 }),
+      }),
+      async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+        const removed = await service.remove(params.id);
+        return textResult(removed ? `已删除定时任务：${params.id}` : `未找到定时任务：${params.id}`);
+      },
+    });
+  };
+}

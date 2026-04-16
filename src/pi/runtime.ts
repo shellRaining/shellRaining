@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { createAgentSession, DefaultResourceLoader, SessionManager, type AgentSessionEvent, type SessionInfo } from "@mariozechner/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader, SessionManager, type AgentSessionEvent, type ExtensionFactory, type SessionInfo } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { getSessionDirectoryForThread } from "./session-store.js";
 import { buildServiceProfileContext, createServiceProfile } from "../runtime/service-profile.js";
@@ -19,6 +19,10 @@ export interface PiImageInput {
 export interface PiPromptCallbacks {
   images?: PiImageInput[];
   onStatus?: (status: string) => Promise<void> | void;
+}
+
+interface PiRuntimeOptions {
+  extensionFactories?: ExtensionFactory[];
 }
 
 interface CachedSession {
@@ -49,7 +53,10 @@ export class PiRuntime {
   private readonly sessions = new Map<string, CachedSession>();
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
 
-  constructor(private readonly config: Config) {}
+  constructor(
+    private readonly config: Config,
+    private readonly options: PiRuntimeOptions = {},
+  ) {}
 
   private async createSession(threadKey: string, cwd: string, mode: "continue" | "new"): Promise<CachedSession> {
     const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
@@ -58,6 +65,7 @@ export class PiRuntime {
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir: this.config.agentDir,
+      extensionFactories: this.options.extensionFactories,
       appendSystemPromptOverride: (base) => [
         ...base,
         buildServiceProfileContext(createServiceProfile(this.config)),

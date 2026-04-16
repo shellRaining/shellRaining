@@ -8,6 +8,12 @@ const sessionDispose = vi.fn();
 const sessionNewSession = vi.fn();
 const sessionManagerContinueRecent = vi.fn(() => ({ mode: "recent" }));
 const sessionManagerCreate = vi.fn(() => ({ mode: "new" }));
+const resourceLoaderReload = vi.fn(async () => undefined);
+const defaultResourceLoader = vi.fn(function DefaultResourceLoaderMock() {
+  return {
+    reload: resourceLoaderReload,
+  };
+});
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(async () => undefined),
@@ -24,9 +30,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
       switchSession: vi.fn(),
     },
   })),
-  DefaultResourceLoader: class {
-    reload = vi.fn();
-  },
+  DefaultResourceLoader: defaultResourceLoader,
   SessionManager: {
     continueRecent: sessionManagerContinueRecent,
     create: sessionManagerCreate,
@@ -67,6 +71,21 @@ describe("PiRuntime", () => {
     sessionNewSession.mockResolvedValue(true);
     sessionManagerContinueRecent.mockReturnValue({ mode: "recent" });
     sessionManagerCreate.mockReturnValue({ mode: "new" });
+    resourceLoaderReload.mockResolvedValue(undefined);
+  });
+
+  it("passes extension factories into the Pi resource loader", async () => {
+    const extensionFactory = vi.fn(async () => undefined);
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig(), {
+      extensionFactories: [extensionFactory],
+    });
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+
+    expect(defaultResourceLoader).toHaveBeenCalledWith(
+      expect.objectContaining({ extensionFactories: [extensionFactory] }),
+    );
   });
 
   it("passes image inputs to the Pi session prompt", async () => {
