@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsgo -p tsconfig.json",
     "start": "node dist/src/index.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsgo --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint",
@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@typescript/native-preview": "7.0.0-dev.20260416.2",
     "oxfmt": "^0.45.0",
     "oxlint": "^1.60.0",
     "tsx": "^4.20.5",
