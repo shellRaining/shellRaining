@@ -13,7 +13,12 @@ import { getWorkspace } from "./runtime/workspace.js";
 
 loadEnv();
 
-if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.https_proxy) {
+if (
+  process.env.HTTP_PROXY ||
+  process.env.HTTPS_PROXY ||
+  process.env.http_proxy ||
+  process.env.https_proxy
+) {
   const undici = (await import("undici")) as {
     EnvHttpProxyAgent: new () => unknown;
     setGlobalDispatcher: (dispatcher: unknown) => void;

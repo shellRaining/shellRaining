@@ -6,9 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let tempRoot: string;
 
-function attachment(
-  input: Partial<Attachment> & { type: Attachment["type"] },
-): Attachment {
+function attachment(input: Partial<Attachment> & { type: Attachment["type"] }): Attachment {
   return {
     data: input.data,
     fetchData: input.fetchData,
@@ -33,8 +31,7 @@ describe("telegram-input", () => {
   });
 
   it("preserves text and sticker emoji", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
 
     const result = await normalizeTelegramInput({
       baseDir: tempRoot,
@@ -54,8 +51,7 @@ describe("telegram-input", () => {
   });
 
   it("turns image attachments into Pi image blocks and saved file references", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
 
     const result = await normalizeTelegramInput({
       baseDir: tempRoot,
@@ -88,8 +84,7 @@ describe("telegram-input", () => {
   });
 
   it("treats Telegram photos without MIME as JPEG image input", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
 
     const result = await normalizeTelegramInput({
       baseDir: tempRoot,
@@ -121,8 +116,7 @@ describe("telegram-input", () => {
   });
 
   it("keeps image-typed attachments with non-image MIME as generic attachments", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
 
     const result = await normalizeTelegramInput({
       baseDir: tempRoot,
@@ -152,8 +146,7 @@ describe("telegram-input", () => {
   });
 
   it("keeps document attachments as file paths without parsing contents", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
 
     const result = await normalizeTelegramInput({
       baseDir: tempRoot,
@@ -180,8 +173,7 @@ describe("telegram-input", () => {
   });
 
   it("explains Telegram oversized download failures without implying an internal limit", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
 
     const result = await normalizeTelegramInput({
       baseDir: tempRoot,
@@ -212,8 +204,7 @@ describe("telegram-input", () => {
   });
 
   it("adds STT transcript for audio when the transcriber succeeds", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
     const transcribe = vi.fn().mockResolvedValue("整理会议纪要");
 
     const result = await normalizeTelegramInput({
@@ -242,8 +233,7 @@ describe("telegram-input", () => {
   });
 
   it("keeps audio file path without warning when STT is not configured", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
     const transcribe = vi.fn().mockResolvedValue("unused transcript");
 
     const result = await normalizeTelegramInput({
@@ -272,8 +262,7 @@ describe("telegram-input", () => {
   });
 
   it("returns unprocessable input when no content was recognized", async () => {
-    const { normalizeTelegramInput } =
-      await import("../src/runtime/telegram-input.js");
+    const { normalizeTelegramInput } = await import("../src/runtime/telegram-input.js");
 
     const result = await normalizeTelegramInput({
       baseDir: tempRoot,

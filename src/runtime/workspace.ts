@@ -40,7 +40,10 @@ export function configureWorkspaceState(baseDir: string): void {
   resetWorkspaceStateForTesting();
 }
 
-export async function getWorkspace(threadId: string, fallbackWorkspace: string = homedir()): Promise<string> {
+export async function getWorkspace(
+  threadId: string,
+  fallbackWorkspace: string = homedir(),
+): Promise<string> {
   await loadState();
   const cwd = state[threadId];
 

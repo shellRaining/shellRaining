@@ -34,7 +34,9 @@ function buildNextSettings(settings: PiSettings, skillsDir: string): PiSettings 
   };
 }
 
-export async function syncPiSettings(options: SyncPiSettingsOptions): Promise<SyncPiSettingsResult> {
+export async function syncPiSettings(
+  options: SyncPiSettingsOptions,
+): Promise<SyncPiSettingsResult> {
   const settingsPath = join(options.agentDir, "settings.json");
   await mkdir(options.agentDir, { recursive: true });
 
@@ -57,7 +59,10 @@ export async function syncPiSettings(options: SyncPiSettingsOptions): Promise<Sy
     const existing = await stat(settingsPath);
     if (existing.isFile()) {
       await mkdir(options.backupDir, { recursive: true });
-      const backupPath = join(options.backupDir, `pi-settings-${normalizeTimestamp(options.timestamp)}.json`);
+      const backupPath = join(
+        options.backupDir,
+        `pi-settings-${normalizeTimestamp(options.timestamp)}.json`,
+      );
       await copyFile(settingsPath, backupPath);
     }
   } catch {

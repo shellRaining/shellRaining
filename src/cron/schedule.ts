@@ -34,7 +34,11 @@ export function computeNextRunAtMs(schedule: CronSchedule, nowMs: number): numbe
   return nextRun?.getTime();
 }
 
-export function applyErrorBackoff(nextRunAtMs: number | undefined, consecutiveErrors: number, nowMs: number): number | undefined {
+export function applyErrorBackoff(
+  nextRunAtMs: number | undefined,
+  consecutiveErrors: number,
+  nowMs: number,
+): number | undefined {
   if (nextRunAtMs === undefined) {
     return undefined;
   }

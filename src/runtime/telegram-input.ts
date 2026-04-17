@@ -29,9 +29,7 @@ export interface NormalizeTelegramInputOptions {
   message: TelegramInputMessage;
   sttConfig: SttConfig;
   threadKey: string;
-  transcribeAudio?: (
-    input: TranscribeAudioInput,
-  ) => Promise<string | undefined>;
+  transcribeAudio?: (input: TranscribeAudioInput) => Promise<string | undefined>;
 }
 
 export interface NormalizedTelegramInput {
@@ -124,9 +122,7 @@ export async function normalizeTelegramInput(
 
   const documentLines: string[] = [];
 
-  for (const [index, attachment] of (
-    options.message.attachments ?? []
-  ).entries()) {
+  for (const [index, attachment] of (options.message.attachments ?? []).entries()) {
     try {
       const data = await loadAttachmentData(attachment);
       const saved = await saveTelegramAttachment({
@@ -153,9 +149,7 @@ export async function normalizeTelegramInput(
           });
           parts.push(`[Telegram image: ${saved.path}]`);
         } else {
-          warnings.push(
-            `Image attachment ${saved.filename} did not include an image MIME type.`,
-          );
+          warnings.push(`Image attachment ${saved.filename} did not include an image MIME type.`);
           documentLines.push(
             `- ${saved.filename}${saved.mimeType ? ` (${saved.mimeType})` : ""}: ${saved.path}`,
           );
@@ -176,8 +170,7 @@ export async function normalizeTelegramInput(
               parts.push(`[Telegram voice transcript]\n${transcript.trim()}`);
             }
           } catch (error) {
-            const message =
-              error instanceof Error ? error.message : String(error);
+            const message = error instanceof Error ? error.message : String(error);
             warnings.push(`STT failed for ${saved.filename}: ${message}`);
           }
         }
@@ -190,9 +183,7 @@ export async function normalizeTelegramInput(
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      warnings.push(
-        formatAttachmentProcessingFailure(attachment, index, message),
-      );
+      warnings.push(formatAttachmentProcessingFailure(attachment, index, message));
     }
   }
 
@@ -209,8 +200,7 @@ export async function normalizeTelegramInput(
   const normalizedText = parts.join("\n\n").trim();
   return {
     images,
-    isProcessable:
-      normalizedText.length > 0 || images.length > 0 || savedFiles.length > 0,
+    isProcessable: normalizedText.length > 0 || images.length > 0 || savedFiles.length > 0,
     savedFiles,
     text: normalizedText,
     warnings,

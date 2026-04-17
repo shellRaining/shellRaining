@@ -35,6 +35,7 @@ Each implementation task ends with its own commit. Do not batch all feature work
 ### Task 1: Add STT Config And Telegram Attachment Prompt Guidance
 
 **Files:**
+
 - Modify: `src/config.ts`
 - Modify: `tests/config.test.ts`
 - Modify: `src/runtime/service-profile.ts`
@@ -45,37 +46,37 @@ Each implementation task ends with its own commit. Do not batch all feature work
 Add this test to `tests/config.test.ts`:
 
 ```ts
-  it("parses optional STT config", async () => {
-    process.env.TELEGRAM_BOT_TOKEN = "test-token";
-    process.env.SHELL_RAINING_STT_BASE_URL = " https://stt.shellraining.xyz/ ";
-    process.env.SHELL_RAINING_STT_API_KEY = " stt-secret ";
-    process.env.SHELL_RAINING_STT_MODEL = " faster-whisper-large-v3 ";
+it("parses optional STT config", async () => {
+  process.env.TELEGRAM_BOT_TOKEN = "test-token";
+  process.env.SHELL_RAINING_STT_BASE_URL = " https://stt.shellraining.xyz/ ";
+  process.env.SHELL_RAINING_STT_API_KEY = " stt-secret ";
+  process.env.SHELL_RAINING_STT_MODEL = " faster-whisper-large-v3 ";
 
-    const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+  const { loadConfig } = await import("../src/config.js");
+  const config = loadConfig();
 
-    expect(config.stt).toEqual({
-      apiKey: "stt-secret",
-      baseUrl: "https://stt.shellraining.xyz",
-      model: "faster-whisper-large-v3",
-    });
+  expect(config.stt).toEqual({
+    apiKey: "stt-secret",
+    baseUrl: "https://stt.shellraining.xyz",
+    model: "faster-whisper-large-v3",
   });
+});
 ```
 
 Add this test to `tests/service-profile.test.ts`:
 
 ```ts
-  it("renders Telegram attachment handling guidance", () => {
-    const result = buildServiceProfileContext({
-      apiBaseUrl: "https://api.shellraining.xyz",
-      crawlUrl: "https://crawl.shellraining.xyz",
-      vikunjaUrl: "https://todo.shellraining.xyz",
-    });
-
-    expect(result).toContain("[Telegram attachments]");
-    expect(result).toContain("Do not claim you read an attachment before reading it");
-    expect(result).toContain("~/.shellRaining/inbox/");
+it("renders Telegram attachment handling guidance", () => {
+  const result = buildServiceProfileContext({
+    apiBaseUrl: "https://api.shellraining.xyz",
+    crawlUrl: "https://crawl.shellraining.xyz",
+    vikunjaUrl: "https://todo.shellraining.xyz",
   });
+
+  expect(result).toContain("[Telegram attachments]");
+  expect(result).toContain("Do not claim you read an attachment before reading it");
+  expect(result).toContain("~/.shellRaining/inbox/");
+});
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -157,6 +158,7 @@ git commit -m "feat: add stt config and attachment guidance"
 ### Task 2: Add OpenAI-Compatible STT Client
 
 **Files:**
+
 - Create: `src/runtime/stt.ts`
 - Create: `tests/stt.test.ts`
 
@@ -228,12 +230,14 @@ describe("stt", () => {
 
     const { transcribeAudio } = await import("../src/runtime/stt.js");
 
-    await expect(transcribeAudio({
-      config: { baseUrl: "https://stt.shellraining.xyz" },
-      data: Buffer.from("voice"),
-      filename: "voice.ogg",
-      mimeType: "audio/ogg",
-    })).rejects.toThrow("STT transcription failed: 503 service unavailable");
+    await expect(
+      transcribeAudio({
+        config: { baseUrl: "https://stt.shellraining.xyz" },
+        data: Buffer.from("voice"),
+        filename: "voice.ogg",
+        mimeType: "audio/ogg",
+      }),
+    ).rejects.toThrow("STT transcription failed: 503 service unavailable");
   });
 });
 ```
@@ -282,9 +286,13 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<stri
 
   const form = new FormData();
   form.append("model", input.config.model?.trim() || "whisper-1");
-  form.append("file", new Blob([new Uint8Array(input.data)], {
-    type: input.mimeType || "application/octet-stream",
-  }), input.filename);
+  form.append(
+    "file",
+    new Blob([new Uint8Array(input.data)], {
+      type: input.mimeType || "application/octet-stream",
+    }),
+    input.filename,
+  );
 
   const headers = input.config.apiKey?.trim()
     ? { Authorization: `Bearer ${input.config.apiKey.trim()}` }
@@ -301,7 +309,7 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<stri
     throw new Error(`STT transcription failed: ${response.status}${body ? ` ${body}` : ""}`);
   }
 
-  const payload = await response.json() as { text?: unknown };
+  const payload = (await response.json()) as { text?: unknown };
   return typeof payload.text === "string" ? payload.text : undefined;
 }
 ```
@@ -330,6 +338,7 @@ git commit -m "feat: add pluggable stt client"
 ### Task 3: Add Telegram Attachment Storage
 
 **Files:**
+
 - Create: `src/runtime/telegram-attachments.ts`
 - Create: `tests/telegram-attachments.test.ts`
 
@@ -382,7 +391,9 @@ describe("telegram-attachments", () => {
     expect(result.filename).toBe("report.pdf");
     expect(result.mimeType).toBe("application/pdf");
     expect(result.type).toBe("file");
-    expect(result.path).toBe(join(tempRoot, "inbox", "telegram__123__456", "telegram_123_456", "report.pdf"));
+    expect(result.path).toBe(
+      join(tempRoot, "inbox", "telegram__123__456", "telegram_123_456", "report.pdf"),
+    );
     await expect(readFile(result.path, "utf-8")).resolves.toBe("hello");
   });
 });
@@ -433,7 +444,10 @@ function safePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "message";
 }
 
-export function safeTelegramFilename(filename: string | undefined, fallbackFilename: string): string {
+export function safeTelegramFilename(
+  filename: string | undefined,
+  fallbackFilename: string,
+): string {
   const trimmed = filename?.trim();
   if (!trimmed) {
     return fallbackFilename;
@@ -443,9 +457,19 @@ export function safeTelegramFilename(filename: string | undefined, fallbackFilen
   return base || fallbackFilename;
 }
 
-export async function saveTelegramAttachment(input: SaveTelegramAttachmentInput): Promise<SavedTelegramAttachment> {
-  const filename = safeTelegramFilename(input.attachment.filename, input.attachment.fallbackFilename);
-  const directory = join(input.baseDir, "inbox", safePathSegment(input.threadKey), safePathSegment(input.messageId));
+export async function saveTelegramAttachment(
+  input: SaveTelegramAttachmentInput,
+): Promise<SavedTelegramAttachment> {
+  const filename = safeTelegramFilename(
+    input.attachment.filename,
+    input.attachment.fallbackFilename,
+  );
+  const directory = join(
+    input.baseDir,
+    "inbox",
+    safePathSegment(input.threadKey),
+    safePathSegment(input.messageId),
+  );
   await mkdir(directory, { recursive: true });
 
   const path = join(directory, filename);
@@ -485,6 +509,7 @@ git commit -m "feat: store telegram input attachments"
 ### Task 4: Add Telegram Input Normalizer
 
 **Files:**
+
 - Create: `src/runtime/telegram-input.ts`
 - Create: `tests/telegram-input.test.ts`
 
@@ -501,7 +526,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let tempRoot: string;
 
-function attachment(input: Partial<Attachment> & { data: Buffer; type: Attachment["type"] }): Attachment {
+function attachment(
+  input: Partial<Attachment> & { data: Buffer; type: Attachment["type"] },
+): Attachment {
   return {
     data: input.data,
     fetchData: input.fetchData,
@@ -568,7 +595,9 @@ describe("telegram-input", () => {
 
     expect(result.text).toContain("what is this?");
     expect(result.text).toContain("[Telegram image:");
-    expect(result.images).toEqual([{ type: "image", data: Buffer.from("image-data").toString("base64"), mimeType: "image/png" }]);
+    expect(result.images).toEqual([
+      { type: "image", data: Buffer.from("image-data").toString("base64"), mimeType: "image/png" },
+    ]);
     expect(result.savedFiles[0]?.filename).toBe("photo.png");
   });
 
@@ -662,7 +691,11 @@ Create `src/runtime/telegram-input.ts` with:
 import type { Attachment } from "chat";
 import type { SttConfig, TranscribeAudioInput } from "./stt.js";
 import { transcribeAudio as defaultTranscribeAudio } from "./stt.js";
-import { saveTelegramAttachment, type SavedTelegramAttachment, type TelegramSavedAttachmentType } from "./telegram-attachments.js";
+import {
+  saveTelegramAttachment,
+  type SavedTelegramAttachment,
+  type TelegramSavedAttachmentType,
+} from "./telegram-attachments.js";
 
 export interface PiImageInput {
   type: "image";
@@ -721,7 +754,9 @@ async function loadAttachmentData(attachment: Attachment): Promise<Buffer> {
   throw new Error("Attachment has no data or fetchData()");
 }
 
-export async function normalizeTelegramInput(options: NormalizeTelegramInputOptions): Promise<NormalizedTelegramInput> {
+export async function normalizeTelegramInput(
+  options: NormalizeTelegramInputOptions,
+): Promise<NormalizedTelegramInput> {
   const parts: string[] = [];
   const images: PiImageInput[] = [];
   const savedFiles: SavedTelegramAttachment[] = [];
@@ -791,7 +826,9 @@ export async function normalizeTelegramInput(options: NormalizeTelegramInputOpti
         continue;
       }
 
-      documentLines.push(`- ${saved.filename}${saved.mimeType ? ` (${saved.mimeType})` : ""}: ${saved.path}`);
+      documentLines.push(
+        `- ${saved.filename}${saved.mimeType ? ` (${saved.mimeType})` : ""}: ${saved.path}`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       warnings.push(`Failed to process attachment ${attachment.name || index + 1}: ${message}`);
@@ -803,7 +840,9 @@ export async function normalizeTelegramInput(options: NormalizeTelegramInputOpti
   }
 
   if (warnings.length > 0) {
-    parts.push(`[Telegram input warnings]\n${warnings.map((warning) => `- ${warning}`).join("\n")}`);
+    parts.push(
+      `[Telegram input warnings]\n${warnings.map((warning) => `- ${warning}`).join("\n")}`,
+    );
   }
 
   const normalizedText = parts.join("\n\n").trim();
@@ -841,6 +880,7 @@ git commit -m "feat: normalize telegram multimodal input"
 ### Task 5: Pass Image Inputs Through Pi Runtime
 
 **Files:**
+
 - Modify: `src/pi/runtime.ts`
 - Create: `tests/pi-runtime.test.ts`
 
@@ -943,13 +983,13 @@ export interface PiPromptCallbacks {
 In `runPrompt()`, replace:
 
 ```ts
-      await session.prompt(text);
+await session.prompt(text);
 ```
 
 with:
 
 ```ts
-      await session.prompt(text, callbacks.images?.length ? { images: callbacks.images } : undefined);
+await session.prompt(text, callbacks.images?.length ? { images: callbacks.images } : undefined);
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -976,6 +1016,7 @@ git commit -m "feat: pass telegram images to pi"
 ### Task 6: Integrate Normalized Input Into Bot Routing
 
 **Files:**
+
 - Modify: `src/bot.ts`
 - Create: `tests/bot-input.test.ts`
 
@@ -989,29 +1030,35 @@ import { isTelegramInputProcessable } from "../src/bot.js";
 
 describe("bot telegram input routing", () => {
   it("treats pure attachment input as processable", () => {
-    expect(isTelegramInputProcessable({
-      images: [],
-      isProcessable: true,
-      savedFiles: [{
-        filename: "report.pdf",
-        mimeType: "application/pdf",
-        path: "/tmp/report.pdf",
-        size: 10,
-        type: "file",
-      }],
-      text: "[Telegram attachments]\n- report.pdf: /tmp/report.pdf",
-      warnings: [],
-    })).toBe(true);
+    expect(
+      isTelegramInputProcessable({
+        images: [],
+        isProcessable: true,
+        savedFiles: [
+          {
+            filename: "report.pdf",
+            mimeType: "application/pdf",
+            path: "/tmp/report.pdf",
+            size: 10,
+            type: "file",
+          },
+        ],
+        text: "[Telegram attachments]\n- report.pdf: /tmp/report.pdf",
+        warnings: [],
+      }),
+    ).toBe(true);
   });
 
   it("treats empty normalized input as not processable", () => {
-    expect(isTelegramInputProcessable({
-      images: [],
-      isProcessable: false,
-      savedFiles: [],
-      text: "",
-      warnings: [],
-    })).toBe(false);
+    expect(
+      isTelegramInputProcessable({
+        images: [],
+        isProcessable: false,
+        savedFiles: [],
+        text: "",
+        warnings: [],
+      }),
+    ).toBe(false);
   });
 });
 ```
@@ -1031,7 +1078,11 @@ Expected: FAIL because `isTelegramInputProcessable` is not exported and bot rout
 In `src/bot.ts`, update imports:
 
 ```ts
-import { normalizeTelegramInput, type NormalizedTelegramInput, type TelegramInputMessage } from "./runtime/telegram-input.js";
+import {
+  normalizeTelegramInput,
+  type NormalizedTelegramInput,
+  type TelegramInputMessage,
+} from "./runtime/telegram-input.js";
 ```
 
 Add this helper near `shouldFallbackToRawTelegramReply()`:
@@ -1051,39 +1102,39 @@ async function handlePrompt(thread: Thread, message: TelegramInputMessage, confi
 Inside `handlePrompt()`, before rate limiting, add normalization:
 
 ```ts
-  const normalized = await normalizeTelegramInput({
-    baseDir: config.baseDir,
-    message,
-    sttConfig: config.stt,
-    threadKey,
-  });
-  if (!isTelegramInputProcessable(normalized)) {
-    await thread.post("没有识别到可处理的 Telegram 输入。请发送文本、图片、文件、语音或贴纸。");
-    return;
-  }
+const normalized = await normalizeTelegramInput({
+  baseDir: config.baseDir,
+  message,
+  sttConfig: config.stt,
+  threadKey,
+});
+if (!isTelegramInputProcessable(normalized)) {
+  await thread.post("没有识别到可处理的 Telegram 输入。请发送文本、图片、文件、语音或贴纸。");
+  return;
+}
 ```
 
 Change the Pi call in `handlePrompt()` to:
 
 ```ts
-  const result = await runtime.prompt(threadKey, normalized.text, workspace, {
-    images: normalized.images,
-    onStatus: async (status) => {
-      await thread.startTyping(status);
-    },
-  });
+const result = await runtime.prompt(threadKey, normalized.text, workspace, {
+  images: normalized.images,
+  onStatus: async (status) => {
+    await thread.startTyping(status);
+  },
+});
 ```
 
 In all three message handlers, replace:
 
 ```ts
-    await handlePrompt(thread, message.text || "", config, runtime);
+await handlePrompt(thread, message.text || "", config, runtime);
 ```
 
 with:
 
 ```ts
-    await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
+await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
 ```
 
 Keep command handling based on `message.text || ""` so existing slash commands behave as before.
@@ -1112,6 +1163,7 @@ git commit -m "feat: route telegram multimodal input"
 ### Task 7: Document Usage And Run Full Verification
 
 **Files:**
+
 - Modify: `README.md`
 
 - [ ] **Step 1: Update README with supported input and STT env vars**

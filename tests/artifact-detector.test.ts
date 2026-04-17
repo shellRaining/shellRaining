@@ -8,13 +8,8 @@ vi.mock("node:fs/promises", () => ({
   stat: (...args: unknown[]) => mockStat(...args),
 }));
 
-const {
-  parseOutputForFiles,
-  categorizeFiles,
-  detectNewFiles,
-  snapshotWorkspace,
-  detectFiles,
-} = await import("../src/runtime/artifact-detector.js");
+const { parseOutputForFiles, categorizeFiles, detectNewFiles, snapshotWorkspace, detectFiles } =
+  await import("../src/runtime/artifact-detector.js");
 
 describe("artifact-detector", () => {
   beforeEach(() => {

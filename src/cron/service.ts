@@ -106,7 +106,10 @@ export class CronService {
     const data = await this.deps.store.load();
     const nowMs = this.deps.now();
     const dueJobs = data.jobs
-      .filter((job) => job.enabled && job.state.nextRunAtMs !== undefined && job.state.nextRunAtMs <= nowMs)
+      .filter(
+        (job) =>
+          job.enabled && job.state.nextRunAtMs !== undefined && job.state.nextRunAtMs <= nowMs,
+      )
       .sort((left, right) => (left.state.nextRunAtMs ?? 0) - (right.state.nextRunAtMs ?? 0));
 
     for (const job of dueJobs) {
@@ -127,7 +130,9 @@ export class CronService {
 
     try {
       const workspace = await this.deps.workspaceForThreadKey(job.threadKey);
-      const result = await this.runWithTimeout(() => this.deps.runtime.prompt(job.threadKey, job.payload.message, workspace));
+      const result = await this.runWithTimeout(() =>
+        this.deps.runtime.prompt(job.threadKey, job.payload.message, workspace),
+      );
 
       if (result.error) {
         const updated = this.buildFailureJob(job, nowMs, result.error);
@@ -250,9 +255,7 @@ export class CronService {
       return updated;
     }
 
-    const normalNext = job.schedule.kind === "at"
-      ? nowMs
-      : computeNextRunAtMs(job.schedule, nowMs);
+    const normalNext = job.schedule.kind === "at" ? nowMs : computeNextRunAtMs(job.schedule, nowMs);
     updated.state.nextRunAtMs = applyErrorBackoff(normalNext, consecutiveErrors, nowMs);
     return updated;
   }

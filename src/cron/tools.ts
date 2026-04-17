@@ -1,5 +1,9 @@
 import { Type } from "@sinclair/typebox";
-import type { AgentToolResult, ExtensionAPI, ExtensionFactory } from "@mariozechner/pi-coding-agent";
+import type {
+  AgentToolResult,
+  ExtensionAPI,
+  ExtensionFactory,
+} from "@mariozechner/pi-coding-agent";
 import type { CronService } from "./service.js";
 import { normalizeCronJobInput, type CronJobInput } from "./normalize.js";
 import type { CronJob } from "./types.js";
@@ -38,7 +42,10 @@ export interface ThreadContext {
   threadKey: string;
 }
 
-export function buildCronExtensionFactory(service: CronService, thread: ThreadContext): ExtensionFactory {
+export function buildCronExtensionFactory(
+  service: CronService,
+  thread: ThreadContext,
+): ExtensionFactory {
   return async (pi: ExtensionAPI) => {
     pi.registerTool({
       name: "cron_create",
@@ -48,8 +55,16 @@ export function buildCronExtensionFactory(service: CronService, thread: ThreadCo
         name: Type.String({ minLength: 1 }),
         schedule: Type.Union([
           Type.Object({ kind: Type.Literal("at"), at: Type.String({ minLength: 1 }) }),
-          Type.Object({ kind: Type.Literal("every"), everyMs: Type.Integer({ minimum: 1 }), anchorMs: Type.Optional(Type.Integer()) }),
-          Type.Object({ kind: Type.Literal("cron"), expr: Type.String({ minLength: 1 }), tz: Type.Optional(Type.String()) }),
+          Type.Object({
+            kind: Type.Literal("every"),
+            everyMs: Type.Integer({ minimum: 1 }),
+            anchorMs: Type.Optional(Type.Integer()),
+          }),
+          Type.Object({
+            kind: Type.Literal("cron"),
+            expr: Type.String({ minLength: 1 }),
+            tz: Type.Optional(Type.String()),
+          }),
         ]),
         payload: Type.Object({
           kind: Type.Literal("agentTurn"),
@@ -57,12 +72,14 @@ export function buildCronExtensionFactory(service: CronService, thread: ThreadCo
         }),
       }),
       async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-        const job = await service.add(normalizeCronJobInput({
-          ...params,
-          chatId: thread.chatId,
-          threadId: thread.threadId,
-          threadKey: thread.threadKey,
-        } as CronJobInput));
+        const job = await service.add(
+          normalizeCronJobInput({
+            ...params,
+            chatId: thread.chatId,
+            threadId: thread.threadId,
+            threadKey: thread.threadKey,
+          } as CronJobInput),
+        );
         return textResult(`已创建定时任务：${job.name}（${job.id}）`);
       },
     });
@@ -91,7 +108,9 @@ export function buildCronExtensionFactory(service: CronService, thread: ThreadCo
       }),
       async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
         const removed = await service.remove(params.id);
-        return textResult(removed ? `已删除定时任务：${params.id}` : `未找到定时任务：${params.id}`);
+        return textResult(
+          removed ? `已删除定时任务：${params.id}` : `未找到定时任务：${params.id}`,
+        );
       },
     });
   };

@@ -68,7 +68,9 @@ describe("bot cron delivery", () => {
 
   it("falls back to plain text when telegram rejects markdown entities", async () => {
     postMessage
-      .mockRejectedValueOnce(Object.assign(new Error("Bad Request: can't parse entities"), { code: "VALIDATION_ERROR" }))
+      .mockRejectedValueOnce(
+        Object.assign(new Error("Bad Request: can't parse entities"), { code: "VALIDATION_ERROR" }),
+      )
       .mockResolvedValueOnce({ id: "m2", threadId: "telegram:1", raw: {} });
 
     const { createBot } = await import("../src/bot.js");
@@ -81,4 +83,3 @@ describe("bot cron delivery", () => {
     expect(postMessage).toHaveBeenNthCalledWith(2, "telegram:1", "done");
   });
 });
-

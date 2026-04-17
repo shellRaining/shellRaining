@@ -13,6 +13,7 @@
 ### Task 1: Bootstrap Project And Reused Utility Modules
 
 **Files:**
+
 - Create: `package.json`
 - Create: `tsconfig.json`
 - Create: `.env.example`
@@ -33,6 +34,7 @@
 ### Task 2: Add Pi Settings Sync And Environment Profile
 
 **Files:**
+
 - Create: `src/runtime/pi-settings.ts`
 - Create: `src/runtime/service-profile.ts`
 - Create: `tests/pi-settings.test.ts`
@@ -46,6 +48,7 @@
 ### Task 3: Build Pi Runtime Bridge
 
 **Files:**
+
 - Create: `src/pi/runtime.ts`
 - Create: `src/pi/session-store.ts`
 - Create: `tests/session-store.test.ts`
@@ -58,6 +61,7 @@
 ### Task 4: Build Telegram App And Command Routing
 
 **Files:**
+
 - Create: `src/bot.ts`
 - Create: `src/index.ts`
 - Create: `src/runtime/message-splitter.ts`
@@ -71,6 +75,7 @@
 ### Task 5: Verify End-To-End Baseline
 
 **Files:**
+
 - Modify: `README.md`
 - Create: `.agents/skills/project-architecture/SKILL.md`
 - Create: `.agents/skills/project-conventions/SKILL.md`

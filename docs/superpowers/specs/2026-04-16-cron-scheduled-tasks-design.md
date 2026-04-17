@@ -41,30 +41,30 @@ Three types aligned with OpenClaw:
 
 ```typescript
 type CronSchedule =
-  | { kind: "at"; at: string }                              // ISO 8601 timestamp
-  | { kind: "every"; everyMs: number; anchorMs?: number }    // anchorMs: epoch ms, base for interval calculation
-  | { kind: "cron"; expr: string; tz?: string }              // standard 5-field cron expression
+  | { kind: "at"; at: string } // ISO 8601 timestamp
+  | { kind: "every"; everyMs: number; anchorMs?: number } // anchorMs: epoch ms, base for interval calculation
+  | { kind: "cron"; expr: string; tz?: string }; // standard 5-field cron expression
 
 interface CronJob {
-  id: string                // nanoid-generated
-  name: string              // Pi-generated human-readable description
-  chatId: number            // Telegram chat ID to send results back to
-  threadKey: string         // Pi session thread key for session reuse
-  enabled: boolean
-  deleteAfterRun: boolean   // true for "at" type; only deleted on success
-  createdAtMs: number
-  schedule: CronSchedule
+  id: string; // nanoid-generated
+  name: string; // Pi-generated human-readable description
+  chatId: number; // Telegram chat ID to send results back to
+  threadKey: string; // Pi session thread key for session reuse
+  enabled: boolean;
+  deleteAfterRun: boolean; // true for "at" type; only deleted on success
+  createdAtMs: number;
+  schedule: CronSchedule;
   payload: {
-    kind: "agentTurn"
-    message: string         // the prompt Pi will execute
-  }
+    kind: "agentTurn";
+    message: string; // the prompt Pi will execute
+  };
   state: {
-    nextRunAtMs?: number
-    lastRunAtMs?: number
-    lastRunStatus?: "success" | "error"
-    lastError?: string
-    consecutiveErrors: number  // reset to 0 on success
-  }
+    nextRunAtMs?: number;
+    lastRunAtMs?: number;
+    lastRunStatus?: "success" | "error";
+    lastError?: string;
+    consecutiveErrors: number; // reset to 0 on success
+  };
 }
 ```
 
@@ -73,7 +73,9 @@ Storage: `~/.shellRaining/cron/jobs.json`
 ```json
 {
   "version": 1,
-  "jobs": [/* CronJob[] */]
+  "jobs": [
+    /* CronJob[] */
+  ]
 }
 ```
 
@@ -96,6 +98,7 @@ src/cron/__tests__/
 ```
 
 Plus:
+
 - Pi skill at `~/Documents/dotfiles/skills/cron/SKILL.md` for intent recognition
 - Pi extension at `~/.pi/agent/extensions/cron-tools.ts` (or inline in shellRaining) to register cron tools
 
@@ -140,6 +143,7 @@ onTimer():
 ### Pi Extension (cron tools registration)
 
 Cron tools (`cron_create`, `cron_list`, `cron_remove`) must be registered via Pi's extension system (`pi.registerTool()`), not via skills. The extension file needs to:
+
 - Accept a `CronService` reference (passed via extension factory or closure)
 - Register `cron_create` tool: accepts schedule + payload + chatId, returns job id
 - Register `cron_list` tool: returns jobs for the current chat
@@ -148,6 +152,7 @@ Cron tools (`cron_create`, `cron_list`, `cron_remove`) must be registered via Pi
 ### Pi Skill (~/Documents/dotfiles/skills/cron/SKILL.md)
 
 A cron skill that instructs Pi to:
+
 - Recognize scheduling/reminder intent from natural language
 - Extract time information and task content
 - Call `cron_create` tool to create jobs
@@ -156,12 +161,14 @@ A cron skill that instructs Pi to:
 ### Proactive Telegram Messaging
 
 The current bot is purely reactive (webhook → response). Cron needs proactive messaging:
+
 - Use Telegram Bot API `sendMessage` directly (via the chat adapter or raw HTTP)
 - Requires storing `chatId` in each CronJob for delivery targeting
 
 ### CronService ↔ PiRuntime Wiring
 
 CronService needs PiRuntime to execute prompts on timer fire. PiRuntime sessions need cron tools registered. Resolve via:
+
 - CronService holds a reference to PiRuntime
 - Cron tools are registered as part of shellRaining's bot setup, with CronService passed in
 - Timer-triggered executions use `PiRuntime.prompt()` with a cron-specific threadKey

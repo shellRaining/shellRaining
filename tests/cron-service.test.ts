@@ -74,7 +74,10 @@ describe("CronService", () => {
   let timeoutCallback: TimeoutCallback | undefined;
 
   beforeEach(() => {
-    runtimePrompt = vi.fn<RuntimePrompt>(async () => ({ artifactsOutput: "artifact", text: "done" }));
+    runtimePrompt = vi.fn<RuntimePrompt>(async () => ({
+      artifactsOutput: "artifact",
+      text: "done",
+    }));
     deliver = vi.fn<Deliver>(async () => undefined);
     workspaceForThreadKey = vi.fn<WorkspaceForThreadKey>(async () => "/mock/workspace");
     timeoutCallback = undefined;
@@ -84,7 +87,6 @@ describe("CronService", () => {
     });
     clearTimeoutFn = vi.fn<ClearTimeoutFn>(() => undefined);
   });
-
 
   it("recomputes nextRunAtMs for enabled repeating jobs on startup and persists hydration changes", async () => {
     const { CronService } = await import("../src/cron/service.js");
@@ -230,7 +232,11 @@ describe("CronService", () => {
     await service.run(oneShot.id);
 
     expect(workspaceForThreadKey).toHaveBeenCalledWith("telegram__42");
-    expect(runtimePrompt).toHaveBeenCalledWith("telegram__42", "Send the daily summary", "/mock/workspace");
+    expect(runtimePrompt).toHaveBeenCalledWith(
+      "telegram__42",
+      "Send the daily summary",
+      "/mock/workspace",
+    );
     expect(deliver).toHaveBeenCalledWith("telegram:42", "(no output)");
     expect(store.snapshot()).toEqual([]);
   });
@@ -359,7 +365,11 @@ describe("CronService", () => {
     await service.runDueJobs();
 
     expect(runtimePrompt).toHaveBeenCalledTimes(1);
-    expect(runtimePrompt).toHaveBeenCalledWith("telegram__42", "Send the daily summary", "/mock/workspace");
+    expect(runtimePrompt).toHaveBeenCalledWith(
+      "telegram__42",
+      "Send the daily summary",
+      "/mock/workspace",
+    );
     expect(deliver).toHaveBeenCalledWith("telegram:42", "done");
     expect(store.snapshot()).toEqual([
       expect.objectContaining({
@@ -377,7 +387,9 @@ describe("CronService", () => {
       }),
     ]);
     expect(setTimeoutFn).toHaveBeenCalledTimes(2);
-    expect(setTimeoutFn.mock.calls.map((call: Parameters<SetTimeoutFn>) => call[1])).toEqual([5_000, 60_000]);
+    expect(setTimeoutFn.mock.calls.map((call: Parameters<SetTimeoutFn>) => call[1])).toEqual([
+      5_000, 60_000,
+    ]);
     expect(timeoutCallback).toEqual(expect.any(Function));
   });
 });

@@ -9,6 +9,7 @@ Allow users to send follow-up messages while the bot is generating a response. T
 Currently, `PiRuntime.prompt()` uses an `inflight` map to track running prompts per thread. When a second message arrives for the same thread while one is already running, the second call simply returns the existing promise — the second message text is lost.
 
 The `pi-coding-agent` library natively supports two APIs for this:
+
 - `session.steer(text, images?)` — injects a steering message, delivered after the current assistant turn finishes, before the next LLM call
 - `session.followUp(text, images?)` — queues a message to be processed after the agent finishes all work
 
@@ -77,13 +78,15 @@ handlePrompt(thread, message, config, runtime):
 ```
 
 Key points:
+
 - When steering, the `workspace` snapshot and `getOrCreateSession` are already handled by the running `runPrompt` — no need to repeat
 - Rate limiting still applies to steer calls (prevents spam during generation)
 - The steer path does NOT call `thread.startTyping()` — the bot is already generating
 
 ### Debounce Interaction
 
-The Chat SDK debounce (1200ms) runs *before* messages reach `handlePrompt`. This means:
+The Chat SDK debounce (1200ms) runs _before_ messages reach `handlePrompt`. This means:
+
 - Two messages within 1200ms → debounce collapses to last one → `handlePrompt` sees one message
 - If bot is generating and user sends a message after debounce window → `handlePrompt` sees it, routes to steer
 
@@ -100,10 +103,10 @@ No changes needed to Chat SDK debounce strategy. The debounce naturally handles 
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
+| File                | Change                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------- |
 | `src/pi/runtime.ts` | Add `steer()`, `isRunning()` methods; simplify `prompt()` to remove inflight dedup |
-| `src/bot.ts` | Add inflight detection branch in `handlePrompt` |
+| `src/bot.ts`        | Add inflight detection branch in `handlePrompt`                                    |
 
 ## Edge Cases
 

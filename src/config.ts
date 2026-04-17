@@ -71,9 +71,11 @@ export function loadConfig(): Config {
 
   const home = homedir();
   const baseDir = process.env.SHELL_RAINING_BASE_DIR?.trim() || join(home, ".shellRaining");
-  const workspace = process.env.SHELL_RAINING_WORKSPACE?.trim() || join(home, "shellRaining-workspace");
+  const workspace =
+    process.env.SHELL_RAINING_WORKSPACE?.trim() || join(home, "shellRaining-workspace");
   const agentDir = process.env.SHELL_RAINING_AGENT_DIR?.trim() || join(home, ".pi", "agent");
-  const skillsDir = process.env.SHELL_RAINING_SKILLS_DIR?.trim() || join(home, "Documents", "dotfiles", "skills");
+  const skillsDir =
+    process.env.SHELL_RAINING_SKILLS_DIR?.trim() || join(home, "Documents", "dotfiles", "skills");
   const allowedUsers = process.env.SHELL_RAINING_ALLOWED_USERS?.trim()
     ? process.env.SHELL_RAINING_ALLOWED_USERS.split(",")
         .map((id) => Number.parseInt(id.trim(), 10))
@@ -92,12 +94,19 @@ export function loadConfig(): Config {
     agentDir,
     skillsDir,
     allowedUsers,
-    rateLimitCooldownMs: Number.parseInt(process.env.SHELL_RAINING_RATE_LIMIT_COOLDOWN_MS || "5000", 10),
+    rateLimitCooldownMs: Number.parseInt(
+      process.env.SHELL_RAINING_RATE_LIMIT_COOLDOWN_MS || "5000",
+      10,
+    ),
     showThinking: parseBoolean(process.env.SHELL_RAINING_SHOW_THINKING, false),
     cron: {
-      jobsPath: process.env.SHELL_RAINING_CRON_JOBS_PATH?.trim() || join(baseDir, "cron", "jobs.json"),
+      jobsPath:
+        process.env.SHELL_RAINING_CRON_JOBS_PATH?.trim() || join(baseDir, "cron", "jobs.json"),
       runTimeoutMs: parseCronNumber(process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS, 5 * 60 * 1000),
-      misfireGraceMs: parseCronNumber(process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS, 5 * 60 * 1000),
+      misfireGraceMs: parseCronNumber(
+        process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS,
+        5 * 60 * 1000,
+      ),
     },
     stt: {
       apiKey: process.env.SHELL_RAINING_STT_API_KEY?.trim() || undefined,

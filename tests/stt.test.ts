@@ -65,11 +65,13 @@ describe("stt", () => {
 
     const { transcribeAudio } = await import("../src/runtime/stt.js");
 
-    await expect(transcribeAudio({
-      config: { baseUrl: "https://stt.shellraining.xyz" },
-      data: Buffer.from("voice"),
-      filename: "voice.ogg",
-      mimeType: "audio/ogg",
-    })).rejects.toThrow("STT transcription failed: 503 service unavailable");
+    await expect(
+      transcribeAudio({
+        config: { baseUrl: "https://stt.shellraining.xyz" },
+        data: Buffer.from("voice"),
+        filename: "voice.ogg",
+        mimeType: "audio/ogg",
+      }),
+    ).rejects.toThrow("STT transcription failed: 503 service unavailable");
   });
 });

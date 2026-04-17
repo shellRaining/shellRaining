@@ -5,7 +5,11 @@ describe("cron schedule", () => {
   it("aligns interval schedules to their anchor", () => {
     expect(
       computeNextRunAtMs(
-        { kind: "every", everyMs: 15 * 60 * 1000, anchorMs: Date.parse("2026-04-16T09:00:00.000Z") },
+        {
+          kind: "every",
+          everyMs: 15 * 60 * 1000,
+          anchorMs: Date.parse("2026-04-16T09:00:00.000Z"),
+        },
         Date.parse("2026-04-16T09:07:00.000Z"),
       ),
     ).toBe(Date.parse("2026-04-16T09:15:00.000Z"));
@@ -14,7 +18,11 @@ describe("cron schedule", () => {
   it("returns the next interval immediately when now matches an anchored boundary", () => {
     expect(
       computeNextRunAtMs(
-        { kind: "every", everyMs: 15 * 60 * 1000, anchorMs: Date.parse("2026-04-16T09:00:00.000Z") },
+        {
+          kind: "every",
+          everyMs: 15 * 60 * 1000,
+          anchorMs: Date.parse("2026-04-16T09:00:00.000Z"),
+        },
         Date.parse("2026-04-16T09:15:00.000Z"),
       ),
     ).toBe(Date.parse("2026-04-16T09:15:00.000Z"));
@@ -40,13 +48,21 @@ describe("cron schedule", () => {
 
   it("applies exponential error backoff from now", () => {
     expect(
-      applyErrorBackoff(Date.parse("2026-04-16T09:00:05.000Z"), 3, Date.parse("2026-04-16T09:00:00.000Z")),
+      applyErrorBackoff(
+        Date.parse("2026-04-16T09:00:05.000Z"),
+        3,
+        Date.parse("2026-04-16T09:00:00.000Z"),
+      ),
     ).toBe(Date.parse("2026-04-16T09:04:00.000Z"));
   });
 
   it("does not move runs backward when the scheduled time is later than backoff", () => {
     expect(
-      applyErrorBackoff(Date.parse("2026-04-16T09:10:00.000Z"), 2, Date.parse("2026-04-16T09:00:00.000Z")),
+      applyErrorBackoff(
+        Date.parse("2026-04-16T09:10:00.000Z"),
+        2,
+        Date.parse("2026-04-16T09:00:00.000Z"),
+      ),
     ).toBe(Date.parse("2026-04-16T09:10:00.000Z"));
   });
 });

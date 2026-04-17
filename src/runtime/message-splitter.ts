@@ -1,6 +1,9 @@
 const DEFAULT_MAX_MESSAGE_LENGTH = 4096;
 
-export function splitMessage(text: string, maxLength: number = DEFAULT_MAX_MESSAGE_LENGTH): string[] {
+export function splitMessage(
+  text: string,
+  maxLength: number = DEFAULT_MAX_MESSAGE_LENGTH,
+): string[] {
   if (text.length <= maxLength) {
     return [text];
   }
@@ -23,7 +26,12 @@ export function splitMessage(text: string, maxLength: number = DEFAULT_MAX_MESSA
       splitIndex = maxLength;
     }
 
-    while (splitByNewline && splitIndex > 0 && remaining[splitIndex] === "\n" && remaining[splitIndex - 1] === "\n") {
+    while (
+      splitByNewline &&
+      splitIndex > 0 &&
+      remaining[splitIndex] === "\n" &&
+      remaining[splitIndex - 1] === "\n"
+    ) {
       splitIndex -= 1;
     }
 

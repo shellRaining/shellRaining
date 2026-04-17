@@ -49,7 +49,9 @@ describe("telegram-attachments", () => {
     expect(result.mimeType).toBe("application/pdf");
     expect(result.type).toBe("file");
     expect(result.size).toBe(5);
-    expect(result.path).toBe(join(tempRoot, "inbox", "telegram__123__456", "telegram_123_456", "report.pdf"));
+    expect(result.path).toBe(
+      join(tempRoot, "inbox", "telegram__123__456", "telegram_123_456", "report.pdf"),
+    );
     await expect(readFile(result.path, "utf-8")).resolves.toBe("hello");
   });
 });

@@ -7,6 +7,8 @@ describe("session-store", () => {
   });
 
   it("creates stable session directory paths", () => {
-    expect(getSessionDirectoryForThread("/base", "telegram__123")).toBe("/base/sessions/telegram__123");
+    expect(getSessionDirectoryForThread("/base", "telegram__123")).toBe(
+      "/base/sessions/telegram__123",
+    );
   });
 });

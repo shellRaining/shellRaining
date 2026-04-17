@@ -12,11 +12,18 @@ import {
   type NormalizedTelegramInput,
   type TelegramInputMessage,
 } from "./runtime/telegram-input.js";
-import { configureWorkspaceState, formatPath, getWorkspace, setWorkspace } from "./runtime/workspace.js";
+import {
+  configureWorkspaceState,
+  formatPath,
+  getWorkspace,
+  setWorkspace,
+} from "./runtime/workspace.js";
 import { PiRuntime } from "./pi/runtime.js";
 import { getThreadKeyFromId } from "./pi/session-store.js";
 
-function parseCommand(messageText: string | null | undefined): { command: string; args: string } | null {
+function parseCommand(
+  messageText: string | null | undefined,
+): { command: string; args: string } | null {
   const text = messageText?.trim();
   if (!text?.startsWith("/")) {
     return null;
@@ -73,11 +80,7 @@ export function formatTelegramStatusMessage(input: {
 }
 
 export function hasPotentialTelegramInput(message: TelegramInputMessage): boolean {
-  return Boolean(
-    message.text?.trim() ||
-    message.attachments?.length ||
-    message.raw?.sticker,
-  );
+  return Boolean(message.text?.trim() || message.attachments?.length || message.raw?.sticker);
 }
 
 async function replyLong(thread: Thread, text: string): Promise<void> {
@@ -93,7 +96,10 @@ async function replyLong(thread: Thread, text: string): Promise<void> {
   }
 }
 
-async function sendDetectedFile(thread: Thread, file: { filename: string; path: string }): Promise<void> {
+async function sendDetectedFile(
+  thread: Thread,
+  file: { filename: string; path: string },
+): Promise<void> {
   const data = await readFile(file.path);
   await thread.post({
     raw: file.filename,
@@ -106,7 +112,12 @@ async function sendDetectedFile(thread: Thread, file: { filename: string; path: 
   });
 }
 
-async function handleCommand(thread: Thread, messageText: string, config: Config, runtime: PiRuntime): Promise<boolean> {
+async function handleCommand(
+  thread: Thread,
+  messageText: string,
+  config: Config,
+  runtime: PiRuntime,
+): Promise<boolean> {
   const parsed = parseCommand(messageText);
   if (!parsed) {
     return false;
@@ -120,18 +131,20 @@ async function handleCommand(thread: Thread, messageText: string, config: Config
       await thread.post(`shellRaining 已连接。\n当前目录：${formatPath(currentWorkspace)}`);
       return true;
     case "help":
-      await thread.post([
-        "可用命令：",
-        "/start",
-        "/help",
-        "/pwd",
-        "/cd <path>",
-        "/home",
-        "/session",
-        "/session switch <n>",
-        "/new",
-        "/status",
-      ].join("\n"));
+      await thread.post(
+        [
+          "可用命令：",
+          "/start",
+          "/help",
+          "/pwd",
+          "/cd <path>",
+          "/home",
+          "/session",
+          "/session switch <n>",
+          "/new",
+          "/status",
+        ].join("\n"),
+      );
       return true;
     case "pwd":
       await thread.post(formatPath(currentWorkspace));
@@ -162,7 +175,9 @@ async function handleCommand(thread: Thread, messageText: string, config: Config
           const title = session.name || session.firstMessage || "(empty)";
           return `${index + 1}. ${title.slice(0, 60)}\n${session.path}`;
         });
-        await thread.post(`最近的 session：\n\n${lines.join("\n\n")}\n\n使用 /session switch <编号> 切换。`);
+        await thread.post(
+          `最近的 session：\n\n${lines.join("\n\n")}\n\n使用 /session switch <编号> 切换。`,
+        );
         return true;
       }
 
@@ -185,28 +200,40 @@ async function handleCommand(thread: Thread, messageText: string, config: Config
       return true;
     }
     case "status":
-      await thread.post(formatTelegramStatusMessage({
-        skillsDir: config.skillsDir,
-        telegramApiBaseUrl: config.telegramApiBaseUrl,
-        threadId: thread.id,
-        workspace: currentWorkspace,
-      }));
+      await thread.post(
+        formatTelegramStatusMessage({
+          skillsDir: config.skillsDir,
+          telegramApiBaseUrl: config.telegramApiBaseUrl,
+          threadId: thread.id,
+          workspace: currentWorkspace,
+        }),
+      );
       return true;
     default:
       return false;
   }
 }
 
-async function handlePrompt(thread: Thread, message: TelegramInputMessage, config: Config, runtime: PiRuntime): Promise<void> {
+async function handlePrompt(
+  thread: Thread,
+  message: TelegramInputMessage,
+  config: Config,
+  runtime: PiRuntime,
+): Promise<void> {
   const threadKey = getThreadKeyFromId(thread.id);
   if (!hasPotentialTelegramInput(message)) {
     await thread.post("没有识别到可处理的 Telegram 输入。请发送文本、图片、文件、语音或贴纸。");
     return;
   }
 
-  const allowed = checkRateLimit(Number.parseInt(thread.channelId.replace(/\D/g, "") || "0", 10), config.rateLimitCooldownMs);
+  const allowed = checkRateLimit(
+    Number.parseInt(thread.channelId.replace(/\D/g, "") || "0", 10),
+    config.rateLimitCooldownMs,
+  );
   if (!allowed.allowed) {
-    await thread.post(`请等待 ${Math.ceil((allowed.retryAfterMs || 0) / 1000)} 秒后再发送下一条消息。`);
+    await thread.post(
+      `请等待 ${Math.ceil((allowed.retryAfterMs || 0) / 1000)} 秒后再发送下一条消息。`,
+    );
     return;
   }
 

@@ -65,7 +65,10 @@ async function getFileList(dir: string): Promise<Map<string, number>> {
   return files;
 }
 
-export async function detectNewFiles(workspace: string, beforeFiles: Map<string, number>): Promise<string[]> {
+export async function detectNewFiles(
+  workspace: string,
+  beforeFiles: Map<string, number>,
+): Promise<string[]> {
   const afterFiles = await getFileList(workspace);
   const newFiles: string[] = [];
 

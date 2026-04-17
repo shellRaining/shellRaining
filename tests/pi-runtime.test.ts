@@ -117,7 +117,10 @@ describe("PiRuntime", () => {
     expect(sessionDispose).toHaveBeenCalledTimes(1);
     expect(createAgentSession).toHaveBeenCalledTimes(2);
     expect(sessionManagerContinueRecent).toHaveBeenCalledTimes(1);
-    expect(sessionManagerCreate).toHaveBeenCalledWith("/mock/workspace", "/mock/base/sessions/telegram__1");
+    expect(sessionManagerCreate).toHaveBeenCalledWith(
+      "/mock/workspace",
+      "/mock/base/sessions/telegram__1",
+    );
   });
 
   it("returns assistant message errors emitted by Pi", async () => {

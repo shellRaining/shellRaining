@@ -42,13 +42,30 @@ function safeTelegramFilenameCandidate(value: string | undefined): string | unde
   return base;
 }
 
-export function safeTelegramFilename(filename: string | undefined, fallbackFilename: string): string {
-  return safeTelegramFilenameCandidate(filename) ?? safeTelegramFilenameCandidate(fallbackFilename) ?? "attachment.bin";
+export function safeTelegramFilename(
+  filename: string | undefined,
+  fallbackFilename: string,
+): string {
+  return (
+    safeTelegramFilenameCandidate(filename) ??
+    safeTelegramFilenameCandidate(fallbackFilename) ??
+    "attachment.bin"
+  );
 }
 
-export async function saveTelegramAttachment(input: SaveTelegramAttachmentInput): Promise<SavedTelegramAttachment> {
-  const filename = safeTelegramFilename(input.attachment.filename, input.attachment.fallbackFilename);
-  const directory = join(input.baseDir, "inbox", safePathSegment(input.threadKey), safePathSegment(input.messageId));
+export async function saveTelegramAttachment(
+  input: SaveTelegramAttachmentInput,
+): Promise<SavedTelegramAttachment> {
+  const filename = safeTelegramFilename(
+    input.attachment.filename,
+    input.attachment.fallbackFilename,
+  );
+  const directory = join(
+    input.baseDir,
+    "inbox",
+    safePathSegment(input.threadKey),
+    safePathSegment(input.messageId),
+  );
   await mkdir(directory, { recursive: true });
 
   const path = join(directory, filename);
