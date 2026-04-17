@@ -7,36 +7,54 @@ import {
   type TelegramSavedAttachmentType,
 } from "./telegram-attachments.js";
 
+/** Base64-encoded image payload sent to the Pi agent. */
 export interface PiImageInput {
   type: "image";
+  /** Base64-encoded image data. */
   data: string;
+  /** MIME type of the image (e.g. `"image/png"`). */
   mimeType: string;
 }
 
+/** Raw Telegram message with optional attachments and sticker metadata. */
 export interface TelegramInputMessage {
+  /** Media attachments (images, audio, documents, video). */
   attachments?: Attachment[];
+  /** Telegram message ID, used for naming saved files. */
   id: string;
+  /** Raw Telegram-specific metadata not covered by the standard `Attachment` type. */
   raw?: {
     sticker?: {
+      /** Unicode emoji associated with the sticker (e.g. "😀"). */
       emoji?: string;
     };
   };
   text?: string | null;
 }
 
+/** Options for normalizing a Telegram message into a unified format for the Pi agent. */
 export interface NormalizeTelegramInputOptions {
+  /** Root directory for saving attachments. */
   baseDir: string;
   message: TelegramInputMessage;
   sttConfig: SttConfig;
+  /** Thread key used to create per-thread attachment subdirectories. */
   threadKey: string;
+  /** Override the STT function (useful for testing). */
   transcribeAudio?: (input: TranscribeAudioInput) => Promise<string | undefined>;
 }
 
+/** Telegram message normalized into text + images, ready for the Pi agent. */
 export interface NormalizedTelegramInput {
+  /** Extracted images encoded as base64 for inline Pi agent consumption. */
   images: PiImageInput[];
+  /** Whether the input contains anything processable (text, images, or saved files). */
   isProcessable: boolean;
+  /** All attachments successfully saved to disk during normalization. */
   savedFiles: SavedTelegramAttachment[];
+  /** Combined text: original message + transcripts + file paths + warnings. */
   text: string;
+  /** Non-fatal issues encountered during normalization (e.g. oversized attachments, STT failures). */
   warnings: string[];
 }
 
@@ -101,6 +119,15 @@ async function loadAttachmentData(attachment: Attachment): Promise<Buffer> {
   throw new Error("Attachment has no data or fetchData()");
 }
 
+/**
+ * Convert a raw Telegram message (text + attachments) into a unified format
+ * consumable by the Pi agent.
+ *
+ * Handles images (base64 for inline agent input), audio (optional STT
+ * transcription), documents (file path references), and stickers (emoji text).
+ * All downloadable attachments are saved to disk; warnings are collected for
+ * non-fatal failures.
+ */
 export async function normalizeTelegramInput(
   options: NormalizeTelegramInputOptions,
 ): Promise<NormalizedTelegramInput> {

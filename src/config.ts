@@ -1,33 +1,57 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+/** Application configuration loaded from environment variables (or `.env` file). */
 export interface Config {
+  /** Telegram Bot API token. **Required.** */
   telegramToken: string;
+  /** Custom Telegram Bot API base URL (e.g. for a local Bot API server). */
   telegramApiBaseUrl?: string;
+  /** Secret for verifying incoming webhook requests. */
   telegramWebhookSecret?: string;
+  /** HTTP server listen port. @defaultValue 3457 */
   port: number;
+  /** Root directory for persistent shellRaining data (sessions, cron store, etc.). */
   baseDir: string;
+  /** Directory where Pi agent workspaces are created (per-thread subdirectories). */
   workspace: string;
+  /** Path to the Pi agent configuration directory. */
   agentDir: string;
+  /** Path to the skills directory synced into Pi's `settings.json`. */
   skillsDir: string;
+  /** Telegram user IDs allowed to interact with the bot. Empty = all users blocked. */
   allowedUsers: number[];
+  /** Minimum interval (ms) between consecutive prompts from the same chat. @defaultValue 5000 */
   rateLimitCooldownMs: number;
+  /** Whether to include the agent's thinking output in Telegram replies. @defaultValue false */
   showThinking: boolean;
   cron: {
+    /** File path for persisting cron jobs to disk. */
     jobsPath: string;
+    /** Maximum wall-clock time (ms) for a single cron prompt execution. @defaultValue 300000 (5 min) */
     runTimeoutMs: number;
+    /** If a job missed its scheduled time by less than this window (ms), run it anyway. @defaultValue 300000 (5 min) */
     misfireGraceMs: number;
   };
+  /** Speech-to-text (Whisper-compatible) configuration for transcribing voice messages. */
   stt: {
+    /** API key for the STT service. */
     apiKey?: string;
+    /** Base URL of the Whisper-compatible STT endpoint. */
     baseUrl?: string;
+    /** Model name to request from the STT service. */
     model?: string;
   };
+  /** URLs for self-hosted services injected into the Pi agent system prompt. */
   serviceProfile: {
+    /** URL of the crawl service. */
     crawlUrl: string;
+    /** URL of the Vikunja (task manager) instance. */
     vikunjaUrl: string;
+    /** URL of the personal API gateway. */
     apiBaseUrl: string;
   };
+  /** Override base URL for the LLM provider (e.g. for a proxy or compatible API). */
   providerBaseUrl?: string;
 }
 
