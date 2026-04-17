@@ -1,7 +1,14 @@
 import { mkdir } from "node:fs/promises";
-import { createAgentSession, DefaultResourceLoader, SessionManager, type AgentSessionEvent, type ExtensionFactory, type SessionInfo } from "@mariozechner/pi-coding-agent";
+import {
+  createAgentSession,
+  DefaultResourceLoader,
+  SessionManager,
+  type AgentSessionEvent,
+  type ExtensionFactory,
+  type SessionInfo,
+} from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
-import { getSessionDirectoryForThread, getChatIdFromThreadKey, getThreadIdFromKey } from "./session-store.js";
+import { getSessionDirectoryForThread } from "./session-store.js";
 import { buildServiceProfileContext, createServiceProfile } from "../runtime/service-profile.js";
 
 export interface PiPromptResult {
@@ -42,7 +49,11 @@ function getAssistantErrorMessage(event: AgentSessionEvent): string | undefined 
   }
 
   const message = event.message as AssistantErrorMessage;
-  if (message.role !== "assistant" || message.stopReason !== "error" || typeof message.errorMessage !== "string") {
+  if (
+    message.role !== "assistant" ||
+    message.stopReason !== "error" ||
+    typeof message.errorMessage !== "string"
+  ) {
     return undefined;
   }
 
@@ -58,7 +69,11 @@ export class PiRuntime {
     private readonly options: PiRuntimeOptions = {},
   ) {}
 
-  private async createSession(threadKey: string, cwd: string, mode: "continue" | "new"): Promise<CachedSession> {
+  private async createSession(
+    threadKey: string,
+    cwd: string,
+    mode: "continue" | "new",
+  ): Promise<CachedSession> {
     const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
     await mkdir(sessionDir, { recursive: true });
 
@@ -77,7 +92,10 @@ export class PiRuntime {
       cwd,
       agentDir: this.config.agentDir,
       resourceLoader,
-      sessionManager: mode === "new" ? SessionManager.create(cwd, sessionDir) : SessionManager.continueRecent(cwd, sessionDir),
+      sessionManager:
+        mode === "new"
+          ? SessionManager.create(cwd, sessionDir)
+          : SessionManager.continueRecent(cwd, sessionDir),
     });
 
     if (this.config.providerBaseUrl) {
@@ -143,7 +161,12 @@ export class PiRuntime {
     return running;
   }
 
-  async prompt(threadKey: string, text: string, cwd: string, callbacks: PiPromptCallbacks = {}): Promise<PiPromptResult> {
+  async prompt(
+    threadKey: string,
+    text: string,
+    cwd: string,
+    callbacks: PiPromptCallbacks = {},
+  ): Promise<PiPromptResult> {
     const execution = this.runPrompt(threadKey, text, cwd, callbacks);
     this.inflight.set(threadKey, execution);
     try {
@@ -197,7 +220,10 @@ export class PiRuntime {
     });
 
     try {
-      await session.prompt(text, callbacks.images?.length ? { images: callbacks.images } : undefined);
+      await session.prompt(
+        text,
+        callbacks.images?.length ? { images: callbacks.images } : undefined,
+      );
       const artifactsOutput = `${output}\n${toolOutput}`.trim();
       if (assistantError) {
         return {

@@ -3,14 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.30.3",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "check": "oxlint && oxfmt --check"
   },
   "dependencies": {
     "@chat-adapter/shared": "link:../chat-telegramify/packages/adapter-shared",
@@ -27,17 +31,20 @@
     "telegramify": "link:../chat-telegramify/packages/telegramify",
     "undici": "^7.16.0"
   },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "oxfmt": "^0.45.0",
+    "oxlint": "^1.60.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "packageManager": "pnpm@10.30.3",
   "pnpm": {
     "overrides": {
       "@chat-adapter/shared": "link:../chat-telegramify/packages/adapter-shared",
       "chat": "link:../chat-telegramify/packages/chat",
       "telegramify": "link:../chat-telegramify/packages/telegramify"
     }
-  },
-  "devDependencies": {
-    "@types/node": "^24.3.0",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
   }
 }
