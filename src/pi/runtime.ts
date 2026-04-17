@@ -126,12 +126,24 @@ export class PiRuntime {
     return session.switchSession(sessionPath);
   }
 
-  async prompt(threadKey: string, text: string, cwd: string, callbacks: PiPromptCallbacks = {}): Promise<PiPromptResult> {
-    const running = this.inflight.get(threadKey);
-    if (running) {
-      return running;
-    }
+  isRunning(threadKey: string): boolean {
+    return this.inflight.has(threadKey);
+  }
 
+  async steer(threadKey: string, text: string, images?: PiImageInput[]): Promise<PiPromptResult> {
+    const cached = this.sessions.get(threadKey);
+    if (!cached) {
+      throw new Error(`No active session for thread: ${threadKey}`);
+    }
+    await cached.session.steer(text, images);
+    const running = this.inflight.get(threadKey);
+    if (!running) {
+      throw new Error(`No inflight prompt for thread: ${threadKey}`);
+    }
+    return running;
+  }
+
+  async prompt(threadKey: string, text: string, cwd: string, callbacks: PiPromptCallbacks = {}): Promise<PiPromptResult> {
     const execution = this.runPrompt(threadKey, text, cwd, callbacks);
     this.inflight.set(threadKey, execution);
     try {

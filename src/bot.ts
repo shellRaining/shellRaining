@@ -221,6 +221,17 @@ async function handlePrompt(thread: Thread, message: TelegramInputMessage, confi
     return;
   }
 
+  if (runtime.isRunning(threadKey)) {
+    const result = await runtime.steer(threadKey, normalized.text, normalized.images);
+    if (result.error) {
+      await thread.post(`执行失败：${result.error}`);
+    }
+    if (result.text) {
+      await replyLong(thread, result.text);
+    }
+    return;
+  }
+
   const workspace = await getWorkspace(threadKey, config.workspace);
   const beforeSnapshot = await snapshotWorkspace(workspace);
   await thread.startTyping();
