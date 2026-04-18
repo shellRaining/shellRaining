@@ -1,6 +1,7 @@
 export interface SttConfig {
   apiKey?: string;
   baseUrl?: string;
+  /** @defaultValue `"whisper-1"` */
   model?: string;
 }
 
@@ -19,6 +20,7 @@ function trimTrailingSlashes(value: string): string {
   return value.slice(0, end);
 }
 
+/** Calls a Whisper-compatible API at `/v1/audio/transcriptions`. Returns `undefined` when `baseUrl` is not configured. */
 export async function transcribeAudio(input: TranscribeAudioInput): Promise<string | undefined> {
   const baseUrl = input.config.baseUrl?.trim();
   if (!baseUrl) {

@@ -3,6 +3,7 @@ import type { Config } from "../config.js";
 export interface ServiceProfile {
   apiBaseUrl: string;
   crawlUrl: string;
+  /** Vikunja (self-hosted task manager) URL. */
   vikunjaUrl: string;
 }
 
@@ -14,6 +15,10 @@ export function createServiceProfile(config: Config): ServiceProfile {
   };
 }
 
+/**
+ * Builds a system-prompt fragment telling the Pi agent about available
+ * self-hosted service endpoints and how to handle Telegram attachments.
+ */
 export function buildServiceProfileContext(profile: ServiceProfile): string {
   return [
     "You are running inside shellRaining's personal environment.",

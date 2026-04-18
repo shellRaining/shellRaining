@@ -42,6 +42,8 @@ export class CronStore {
     );
     const tempPath = `${this.jobsPath}.tmp`;
 
+    // Atomic write: write to a temp file first, then rename. rename() is
+    // atomic on most filesystems, so a crash mid-write won't corrupt the store.
     await writeFile(tempPath, `${next}\n`, "utf8");
     await rename(tempPath, this.jobsPath);
   }

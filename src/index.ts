@@ -13,6 +13,8 @@ import { getWorkspace } from "./runtime/workspace.js";
 
 loadEnv();
 
+// When running behind an HTTP proxy (e.g. in a container), undici needs explicit
+// global dispatcher setup — Node's built-in fetch doesn't respect *_PROXY env vars.
 if (
   process.env.HTTP_PROXY ||
   process.env.HTTPS_PROXY ||

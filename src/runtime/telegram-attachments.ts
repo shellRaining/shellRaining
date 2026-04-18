@@ -42,6 +42,13 @@ function safeTelegramFilenameCandidate(value: string | undefined): string | unde
   return base;
 }
 
+/**
+ * Produces a safe filename for saving a Telegram attachment.
+ *
+ * Resolution order: original `filename` → `fallbackFilename` → `"attachment.bin"`.
+ * Rejects path-traversal names (e.g. `".."`, `"/etc/passwd"`) by extracting only the basename
+ * and discarding entries that equal `.` or `..`.
+ */
 export function safeTelegramFilename(
   filename: string | undefined,
   fallbackFilename: string,
@@ -53,6 +60,7 @@ export function safeTelegramFilename(
   );
 }
 
+/** Saves attachment bytes to `inbox/{threadKey}/{messageId}/` under `baseDir`. */
 export async function saveTelegramAttachment(
   input: SaveTelegramAttachmentInput,
 ): Promise<SavedTelegramAttachment> {

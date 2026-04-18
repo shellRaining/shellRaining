@@ -20,6 +20,7 @@ import {
 import { PiRuntime } from "./pi/runtime.js";
 import { getThreadKeyFromId } from "./pi/session-store.js";
 
+/** Strips the `@botname` suffix that Telegram adds in group mentions (e.g. `/start@mybot` → `/start`). */
 function parseCommand(
   messageText: string | null | undefined,
 ): { command: string; args: string } | null {
@@ -50,6 +51,7 @@ export interface BotRuntime {
   };
 }
 
+/** Telegram's MarkdownV2 parser rejects malformed entities; fall back to plain text when that happens. */
 export function shouldFallbackToRawTelegramReply(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
@@ -82,6 +84,10 @@ export function hasPotentialTelegramInput(message: TelegramInputMessage): boolea
   return Boolean(message.text?.trim() || message.attachments?.length || message.raw?.sticker);
 }
 
+/**
+ * Splits `text` at the 4096-char Telegram limit, sending each chunk as a separate message.
+ * Tries Markdown first; on Telegram parse errors, falls back to raw text for that chunk.
+ */
 async function replyLong(thread: Thread, text: string): Promise<void> {
   for (const chunk of splitMessage(text)) {
     try {
@@ -213,6 +219,14 @@ async function handleCommand(
   }
 }
 
+/**
+ * 5-step prompt pipeline:
+ * 1. Rate-limit check per chat.
+ * 2. Normalize raw Telegram input (text, voice-to-text, attachment paths, stickers).
+ * 3. If the Pi agent is already running, steer the in-flight session instead of starting a new one.
+ * 4. Otherwise, snapshot workspace, then prompt a fresh session.
+ * 5. After completion, detect any new/changed files and send them back as attachments.
+ */
 async function handlePrompt(
   thread: Thread,
   message: TelegramInputMessage,
@@ -248,6 +262,7 @@ async function handlePrompt(
   }
 
   const workspace = await getWorkspace(threadKey, config.workspace);
+  // `snapshotWorkspace` must run before `prompt` so `detectFiles` can diff against the pre-run state.
   const beforeSnapshot = await snapshotWorkspace(workspace);
   await thread.startTyping();
 

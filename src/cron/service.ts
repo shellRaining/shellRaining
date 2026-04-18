@@ -11,6 +11,10 @@ export interface CronServiceRuntime {
   prompt(threadKey: string, text: string, cwd: string): Promise<{ text: string; error?: string }>;
 }
 
+/**
+ * Dependencies for `CronService`, injected so that time sources and timers
+ * can be controlled in tests (e.g. fake `now()`, immediate `setTimeoutFn`).
+ */
 export interface CronServiceDeps {
   store: CronServiceStore;
   runtime: CronServiceRuntime;
@@ -20,12 +24,17 @@ export interface CronServiceDeps {
   setTimeoutFn: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   clearTimeoutFn: (handle: ReturnType<typeof setTimeout>) => void;
   runTimeoutMs: number;
+  /**
+   * One-shot (`"at"`) jobs whose scheduled time is farther in the past than
+   * this threshold are marked as "missed" at startup rather than executed.
+   */
   misfireGraceMs: number;
 }
 
 export class CronService {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private started = false;
+  /** Coalesces concurrent `runDueJobs` calls into a single execution. */
   private runningDueJobs: Promise<void> | undefined;
 
   constructor(private readonly deps: CronServiceDeps) {}
@@ -167,6 +176,8 @@ export class CronService {
         return undefined;
       }
 
+      // `nowMs + 1` avoids immediately re-scheduling an "every" job whose
+      // interval aligns with the current millisecond.
       updated.state.nextRunAtMs = computeNextRunAtMs(job.schedule, nowMs + 1);
       await this.saveUpdatedJob(data, updated);
       if (rescheduleAfterRun) {
@@ -184,6 +195,11 @@ export class CronService {
     }
   }
 
+  /**
+   * At startup, mark one-shot (`"at"`) jobs that were missed while the service
+   * was offline and recompute `nextRunAtMs` for all enabled jobs based on the
+   * current time.
+   */
   private async hydrateStartupJobs(): Promise<void> {
     const data = await this.deps.store.load();
     const nowMs = this.deps.now();
@@ -236,6 +252,10 @@ export class CronService {
     });
   }
 
+  /**
+   * Auto-disable one-shot (`"at"`) jobs after 3 consecutive errors.
+   * For recurring jobs, apply exponential backoff to `nextRunAtMs` instead.
+   */
   private buildFailureJob(job: CronJob, nowMs: number, errorMessage: string): CronJob {
     const consecutiveErrors = job.state.consecutiveErrors + 1;
     const updated: CronJob = {
@@ -255,6 +275,8 @@ export class CronService {
       return updated;
     }
 
+    // For one-shot jobs that haven't hit the error threshold yet, retry
+    // immediately (from `nowMs`) so the next attempt happens soon.
     const normalNext = job.schedule.kind === "at" ? nowMs : computeNextRunAtMs(job.schedule, nowMs);
     updated.state.nextRunAtMs = applyErrorBackoff(normalNext, consecutiveErrors, nowMs);
     return updated;

@@ -1,6 +1,7 @@
 import { Cron } from "croner";
 import type { CronSchedule } from "./types.js";
 
+/** Base delay for exponential error backoff: `ERROR_BACKOFF_BASE_MS * 2^(consecutiveErrors-1)`. */
 const ERROR_BACKOFF_BASE_MS = 60_000;
 
 export function computeNextRunAtMs(schedule: CronSchedule, nowMs: number): number | undefined {

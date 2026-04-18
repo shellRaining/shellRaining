@@ -36,6 +36,9 @@ export function normalizeCronJobInput(input: CronJobInput): CronJob {
     threadId: input.threadId,
     threadKey: input.threadKey,
     enabled: true,
+    // `deleteAfterRun` is a misnomer: the job is not deleted on success but
+    // rather auto-disabled after 3 consecutive errors. For one-shot ("at") jobs
+    // it is set to `true` so that successful runs remove the job entirely.
     deleteAfterRun: input.schedule.kind === "at",
     createdAtMs: Date.now(),
     schedule: input.schedule,

@@ -35,6 +35,12 @@ async function saveState(): Promise<void> {
   await writeFile(stateFilePath, JSON.stringify(state, null, 2));
 }
 
+/**
+ * Reconfigures the workspace state file path. Called once at startup so that
+ * state is stored relative to the configured `baseDir` rather than the default
+ * `~/.shellRaining/state/`. Also resets in-memory state, which is necessary
+ * between test runs.
+ */
 export function configureWorkspaceState(baseDir: string): void {
   stateFilePath = join(baseDir, "state", "workspaces.json");
   resetWorkspaceStateForTesting();
@@ -54,13 +60,19 @@ export async function getWorkspace(
         return cwd;
       }
     } catch {
-      // Fall through to fallback workspace.
     }
   }
 
   return fallbackWorkspace;
 }
 
+/**
+ * Changes the working directory for a thread. Supports `~` expansion and
+ * relative paths (resolved against the thread's current directory).
+ * Persists the result to disk so it survives restarts.
+ *
+ * @throws When the resolved path does not exist or is not a directory.
+ */
 export async function setWorkspace(
   threadId: string,
   path: string,

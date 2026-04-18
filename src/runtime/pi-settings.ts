@@ -10,6 +10,7 @@ export interface SyncPiSettingsOptions {
   agentDir: string;
   skillsDir: string;
   backupDir: string;
+  /** Injected timestamp for deterministic backup filenames in tests. */
   timestamp?: string;
 }
 
@@ -34,6 +35,11 @@ function buildNextSettings(settings: PiSettings, skillsDir: string): PiSettings 
   };
 }
 
+/**
+ * Ensures the skills directory is listed in Pi's `settings.json`.
+ * Backs up the existing file (timestamped copy) before overwriting.
+ * No-op if the skills directory is already present.
+ */
 export async function syncPiSettings(
   options: SyncPiSettingsOptions,
 ): Promise<SyncPiSettingsResult> {

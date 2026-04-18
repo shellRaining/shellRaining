@@ -62,6 +62,10 @@ function getAssistantErrorMessage(event: AgentSessionEvent): string | undefined 
 
 export class PiRuntime {
   private readonly sessions = new Map<string, CachedSession>();
+  /**
+   * Tracks in-flight prompt executions per thread so that `steer()` can
+   * await the running promise when injecting a mid-session message.
+   */
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
 
   constructor(
@@ -148,6 +152,11 @@ export class PiRuntime {
     return this.inflight.has(threadKey);
   }
 
+  /**
+   * Inject a message into an already-running session (used for mid-turn
+   * steering). Throws if no session or no inflight prompt exists for the thread.
+   * Returns the inflight prompt's result once it completes.
+   */
   async steer(threadKey: string, text: string, images?: PiImageInput[]): Promise<PiPromptResult> {
     const cached = this.sessions.get(threadKey);
     if (!cached) {
@@ -161,6 +170,11 @@ export class PiRuntime {
     return running;
   }
 
+  /**
+   * Execute a prompt and register it in `inflight` *before* starting so that
+   * concurrent `steer()` calls can discover and await it. The entry is removed
+   * in a `finally` block regardless of outcome.
+   */
   async prompt(
     threadKey: string,
     text: string,

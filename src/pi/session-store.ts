@@ -1,5 +1,9 @@
 import { join } from "node:path";
 
+/**
+ * Replaces `:` with `__` because `:` is not safe for filesystem paths
+ * (e.g. forbidden in Windows filenames, used as path separator in some contexts).
+ */
 export function getThreadKeyFromId(threadId: string): string {
   return threadId.replaceAll(":", "__");
 }
