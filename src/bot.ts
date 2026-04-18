@@ -4,7 +4,6 @@ import { createTelegramAdapter } from "@chat-adapter/telegram";
 import { Chat, type Thread } from "chat";
 import type { Config } from "./config.js";
 import { isUserAllowed } from "./runtime/access-control.js";
-import { checkRateLimit } from "./runtime/rate-limiter.js";
 import { detectFiles, snapshotWorkspace } from "./runtime/artifact-detector.js";
 import { splitMessage } from "./runtime/message-splitter.js";
 import {
@@ -223,17 +222,6 @@ async function handlePrompt(
   const threadKey = getThreadKeyFromId(thread.id);
   if (!hasPotentialTelegramInput(message)) {
     await thread.post("没有识别到可处理的 Telegram 输入。请发送文本、图片、文件、语音或贴纸。");
-    return;
-  }
-
-  const allowed = checkRateLimit(
-    Number.parseInt(thread.channelId.replace(/\D/g, "") || "0", 10),
-    config.rateLimitCooldownMs,
-  );
-  if (!allowed.allowed) {
-    await thread.post(
-      `请等待 ${Math.ceil((allowed.retryAfterMs || 0) / 1000)} 秒后再发送下一条消息。`,
-    );
     return;
   }
 

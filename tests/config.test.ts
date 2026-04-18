@@ -71,14 +71,12 @@ describe("config", () => {
     expect(config.cron.misfireGraceMs).toBe(5 * 60 * 1000);
   });
 
-  it("parses allowed users and custom rate limit", async () => {
+  it("parses allowed users", async () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
     process.env.SHELL_RAINING_ALLOWED_USERS = "123,456";
-    process.env.SHELL_RAINING_RATE_LIMIT_COOLDOWN_MS = "10000";
     const { loadConfig } = await import("../src/config.js");
     const config = loadConfig();
     expect(config.allowedUsers).toEqual([123, 456]);
-    expect(config.rateLimitCooldownMs).toBe(10000);
   });
 
   it("parses optional STT config", async () => {

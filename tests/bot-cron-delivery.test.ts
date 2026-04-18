@@ -37,7 +37,6 @@ function createConfig() {
       runTimeoutMs: 5 * 60 * 1000,
     },
     port: 1234,
-    rateLimitCooldownMs: 0,
     serviceProfile: {
       apiBaseUrl: "https://api.shellraining.xyz",
       crawlUrl: "https://crawl.shellraining.xyz",

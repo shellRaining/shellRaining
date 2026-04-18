@@ -21,8 +21,6 @@ export interface Config {
   skillsDir: string;
   /** Telegram user IDs allowed to interact with the bot. Empty = all users blocked. */
   allowedUsers: number[];
-  /** Minimum interval (ms) between consecutive prompts from the same chat. @defaultValue 5000 */
-  rateLimitCooldownMs: number;
   /** Whether to include the agent's thinking output in Telegram replies. @defaultValue false */
   showThinking: boolean;
   cron: {
@@ -118,10 +116,6 @@ export function loadConfig(): Config {
     agentDir,
     skillsDir,
     allowedUsers,
-    rateLimitCooldownMs: Number.parseInt(
-      process.env.SHELL_RAINING_RATE_LIMIT_COOLDOWN_MS || "5000",
-      10,
-    ),
     showThinking: parseBoolean(process.env.SHELL_RAINING_SHOW_THINKING, false),
     cron: {
       jobsPath:
