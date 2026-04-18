@@ -49,4 +49,6 @@ pnpm install
 cp .env.example .env
 pnpm test
 pnpm dev
+pnpm run lint
+pnpm run fmt
 ```
