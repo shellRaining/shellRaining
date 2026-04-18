@@ -249,6 +249,150 @@ describe("CronService", () => {
     expect(store.snapshot()).toEqual([]);
   });
 
+  it("appends the current time line before running cron payloads", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    const job = createJob({
+      id: "cron-time-aware",
+      schedule: { kind: "cron", expr: "0 23 * * *", tz: "Asia/Shanghai" },
+      payload: {
+        kind: "agentTurn",
+        message: "请帮我整理今天完成的事情，并生成简短日记草稿。",
+      },
+      state: {
+        consecutiveErrors: 0,
+        nextRunAtMs: nowMs,
+      },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    await service.run(job.id);
+
+    expect(runtimePrompt).toHaveBeenCalledWith(
+      "telegram__42",
+      expect.stringContaining("Current time:"),
+      "/mock/workspace",
+    );
+    expect(runtimePrompt.mock.calls[0]?.[1]).toContain(
+      "请帮我整理今天完成的事情，并生成简短日记草稿。",
+    );
+    expect(runtimePrompt.mock.calls[0]?.[1]).toContain("Current time: Thu");
+    expect(runtimePrompt.mock.calls[0]?.[1]).toContain("Asia/Shanghai");
+    expect(runtimePrompt.mock.calls[0]?.[1]).toContain("UTC");
+  });
+
+  it("does not append the current time line twice", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    const job = createJob({
+      id: "cron-time-aware-dedupe",
+      schedule: { kind: "cron", expr: "0 23 * * *", tz: "Asia/Shanghai" },
+      payload: {
+        kind: "agentTurn",
+        message:
+          "请帮我整理今天完成的事情，并生成简短日记草稿。\nCurrent time: Thu 2026-04-16 17:00 Asia/Shanghai / 2026-04-16 09:00 UTC",
+      },
+      state: {
+        consecutiveErrors: 0,
+        nextRunAtMs: nowMs,
+      },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    await service.run(job.id);
+
+    expect(runtimePrompt).toHaveBeenCalledTimes(1);
+    expect((runtimePrompt.mock.calls[0]?.[1].match(/Current time:/g) ?? []).length).toBe(1);
+  });
+
+  it("still appends a time line when the payload only mentions Current time text", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    const job = createJob({
+      id: "cron-time-mentioned-in-body",
+      schedule: { kind: "cron", expr: "0 23 * * *", tz: "Asia/Shanghai" },
+      payload: {
+        kind: "agentTurn",
+        message: "请把提示词里的 Current time: 改成 Now:，然后继续整理今天的事情。",
+      },
+      state: {
+        consecutiveErrors: 0,
+        nextRunAtMs: nowMs,
+      },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    await service.run(job.id);
+
+    expect((runtimePrompt.mock.calls[0]?.[1].match(/Current time:/g) ?? []).length).toBe(2);
+    expect(runtimePrompt.mock.calls[0]?.[1]).toContain("Current time: Thu");
+  });
+
+  it("uses the local timezone weekday when local time crosses into the next day", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    const crossDayNowMs = Date.parse("2026-04-16T23:30:00.000Z");
+    const job = createJob({
+      id: "cron-cross-day-weekday",
+      schedule: { kind: "cron", expr: "30 7 * * *", tz: "Asia/Shanghai" },
+      state: {
+        consecutiveErrors: 0,
+        nextRunAtMs: crossDayNowMs,
+      },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => crossDayNowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    await service.run(job.id);
+
+    expect(runtimePrompt.mock.calls[0]?.[1]).toContain(
+      "Current time: Fri 2026-04-17 07:30 Asia/Shanghai / 2026-04-16 23:30 UTC",
+    );
+  });
+
   it("applies retry backoff after failures for repeating jobs", async () => {
     const { CronService } = await import("../src/cron/service.js");
     runtimePrompt.mockResolvedValue({ text: "", error: "boom" });

@@ -6,6 +6,7 @@ import type { Config } from "./config.js";
 import { isUserAllowed } from "./runtime/access-control.js";
 import { detectFiles, snapshotWorkspace } from "./runtime/artifact-detector.js";
 import { splitMessage } from "./runtime/message-splitter.js";
+import { injectPromptTimestampPrefix } from "./runtime/time-awareness.js";
 import {
   normalizeTelegramInput,
   type NormalizedTelegramInput,
@@ -250,8 +251,10 @@ async function handlePrompt(
     return;
   }
 
+  const promptText = injectPromptTimestampPrefix(normalized.text);
+
   if (runtime.isRunning(threadKey)) {
-    const result = await runtime.steer(threadKey, normalized.text, normalized.images);
+    const result = await runtime.steer(threadKey, promptText, normalized.images);
     if (result.error) {
       await thread.post(`执行失败：${result.error}`);
     }
@@ -266,7 +269,7 @@ async function handlePrompt(
   const beforeSnapshot = await snapshotWorkspace(workspace);
   await thread.startTyping();
 
-  const result = await runtime.prompt(threadKey, normalized.text, workspace, {
+  const result = await runtime.prompt(threadKey, promptText, workspace, {
     images: normalized.images,
     onStatus: async (status) => {
       await thread.startTyping(status);

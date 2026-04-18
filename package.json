@@ -27,11 +27,13 @@
     "croner": "^9.1.0",
     "dotenv": "^16.6.1",
     "hono": "^4.12.5",
+    "luxon": "^3.7.2",
     "nanoid": "^5.1.5",
     "telegramify": "link:../chat-telegramify/packages/telegramify",
     "undici": "^7.16.0"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.1",
     "@types/node": "^24.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260416.2",
     "oxfmt": "^0.45.0",
@@ -46,6 +48,11 @@
       "@chat-adapter/shared": "link:../chat-telegramify/packages/adapter-shared",
       "chat": "link:../chat-telegramify/packages/chat",
       "telegramify": "link:../chat-telegramify/packages/telegramify"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "koffi",
+      "protobufjs"
+    ]
   }
 }

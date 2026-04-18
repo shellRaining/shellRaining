@@ -1,8 +1,29 @@
+import { appendCurrentTimeLine } from "../runtime/time-awareness.js";
 import { applyErrorBackoff, computeNextRunAtMs } from "./schedule.js";
 import { findEarliestNextRunAtMs, planTimerDelayMs } from "./timer.js";
 import type { CronJob, CronStoreData } from "./types.js";
 
 const DEFAULT_CONDITION_TIMEOUT_MS = 30_000;
+
+function resolveCronPromptTimezone(job: CronJob): string {
+  if (job.schedule.kind !== "cron") {
+    return "UTC";
+  }
+
+  const timezone = job.schedule.tz?.trim();
+  return timezone || "UTC";
+}
+
+function appendCronCurrentTimeLine(message: string, job: CronJob, nowMs: number): string {
+  if (job.schedule.kind !== "cron") {
+    return message.trimEnd();
+  }
+
+  return appendCurrentTimeLine(message, {
+    nowMs,
+    timeZone: resolveCronPromptTimezone(job),
+  });
+}
 
 export interface CronServiceStore {
   load(): Promise<CronStoreData>;
@@ -182,8 +203,9 @@ export class CronService {
         }
       }
 
+      const promptText = appendCronCurrentTimeLine(job.payload.message, job, nowMs);
       const result = await this.runWithTimeout(() =>
-        this.deps.runtime.prompt(job.threadKey, job.payload.message, workspace),
+        this.deps.runtime.prompt(job.threadKey, promptText, workspace),
       );
 
       if (result.error) {
