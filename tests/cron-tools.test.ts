@@ -97,6 +97,32 @@ describe("buildCronExtensionFactory", () => {
     expect(result.content[0]?.text).not.toContain("别的聊天");
   });
 
+  it("forwards condition fields through cron_create", async () => {
+    const { buildCronExtensionFactory } = await import("../src/cron/tools.js");
+    const service = {
+      add: vi.fn(async (job: CronJob) => job),
+      listJobs: vi.fn(async () => []),
+      remove: vi.fn(async () => false),
+    };
+    const registerTool = vi.fn();
+
+    await buildCronExtensionFactory(service as any, thread)(createExtensionApi(registerTool));
+
+    const tool = getRegisteredTool(registerTool, "cron_create");
+    await tool.execute("tool_4", {
+      name: "条件任务",
+      schedule: { kind: "every", everyMs: 60_000 },
+      payload: { kind: "agentTurn", message: "处理数据" },
+      condition: { command: "test -f /tmp/done", timeoutMs: 45000 },
+    });
+
+    expect(service.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        condition: { command: "test -f /tmp/done", timeoutMs: 45000 },
+      }),
+    );
+  });
+
   it("removes jobs through cron_remove", async () => {
     const { buildCronExtensionFactory } = await import("../src/cron/tools.js");
     const service = {

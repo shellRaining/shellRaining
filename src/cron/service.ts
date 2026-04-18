@@ -2,6 +2,8 @@ import { applyErrorBackoff, computeNextRunAtMs } from "./schedule.js";
 import { findEarliestNextRunAtMs, planTimerDelayMs } from "./timer.js";
 import type { CronJob, CronStoreData } from "./types.js";
 
+const DEFAULT_CONDITION_TIMEOUT_MS = 30_000;
+
 export interface CronServiceStore {
   load(): Promise<CronStoreData>;
   save(data: CronStoreData): Promise<void>;
@@ -20,6 +22,11 @@ export interface CronServiceDeps {
   runtime: CronServiceRuntime;
   deliver: (threadId: string, text: string) => Promise<void>;
   workspaceForThreadKey: (threadKey: string) => Promise<string> | string;
+  execCommand: (
+    command: string,
+    cwd: string,
+    timeoutMs: number,
+  ) => Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>;
   now: () => number;
   setTimeoutFn: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   clearTimeoutFn: (handle: ReturnType<typeof setTimeout>) => void;
@@ -139,6 +146,42 @@ export class CronService {
 
     try {
       const workspace = await this.deps.workspaceForThreadKey(job.threadKey);
+
+      if (job.condition) {
+        const condResult = await this.deps.execCommand(
+          job.condition.command,
+          workspace,
+          job.condition.timeoutMs ?? DEFAULT_CONDITION_TIMEOUT_MS,
+        );
+
+        if (condResult.exitCode === 1) {
+          const updated: CronJob = {
+            ...job,
+            state: {
+              ...job.state,
+              nextRunAtMs: computeNextRunAtMs(job.schedule, nowMs + 1),
+            },
+          };
+          await this.saveUpdatedJob(data, updated);
+          if (rescheduleAfterRun) {
+            await this.scheduleNextTimer();
+          }
+          return updated;
+        }
+
+        if (condResult.exitCode !== 0) {
+          const message = condResult.signal
+            ? `Condition command terminated by signal ${condResult.signal}`
+            : `Condition command exited with code ${condResult.exitCode}`;
+          const updated = this.buildFailureJob(job, nowMs, message);
+          await this.saveUpdatedJob(data, updated);
+          if (rescheduleAfterRun) {
+            await this.scheduleNextTimer();
+          }
+          return updated;
+        }
+      }
+
       const result = await this.runWithTimeout(() =>
         this.deps.runtime.prompt(job.threadKey, job.payload.message, workspace),
       );

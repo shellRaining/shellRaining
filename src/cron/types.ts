@@ -10,6 +10,11 @@ export type CronSchedule =
   | { kind: "every"; everyMs: number; anchorMs?: number }
   | { kind: "cron"; expr: string; tz?: string };
 
+export interface CronCondition {
+  command: string;
+  timeoutMs?: number;
+}
+
 /** A persistent, scheduled task that sends prompts to the Pi agent on a recurring or one-shot basis. */
 export interface CronJob {
   /** Unique identifier (UUID). */
@@ -29,6 +34,7 @@ export interface CronJob {
   /** Epoch milliseconds when the job was created. */
   createdAtMs: number;
   schedule: CronSchedule;
+  condition?: CronCondition;
   payload: {
     kind: "agentTurn";
     /** The text prompt sent to the Pi agent when the job fires. */

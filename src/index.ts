@@ -3,6 +3,8 @@ import { Hono } from "hono";
 import { config as loadEnv } from "dotenv";
 import { createBot } from "./bot.js";
 import { loadConfig } from "./config.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { CronService } from "./cron/service.js";
 import { CronStore } from "./cron/store.js";
 import { buildCronExtensionFactory } from "./cron/tools.js";
@@ -36,6 +38,36 @@ await syncPiSettings({
 });
 
 const cronStore = new CronStore(config.cron.jobsPath);
+const execFileAsync = promisify(execFile);
+
+async function execCommand(command: string, cwd: string, timeoutMs: number) {
+  try {
+    await execFileAsync("bash", ["-c", command], {
+      cwd,
+      timeout: timeoutMs,
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+    });
+    return { exitCode: 0 as const };
+  } catch (error) {
+    const details = error as NodeJS.ErrnoException & {
+      code?: string | number;
+      signal?: NodeJS.Signals;
+      killed?: boolean;
+    };
+
+    if (typeof details.code === "number") {
+      return { exitCode: details.code, signal: details.signal };
+    }
+
+    if (details.signal) {
+      return { exitCode: null, signal: details.signal };
+    }
+
+    throw error;
+  }
+}
+
 let runtime: PiRuntime;
 const cronService = new CronService({
   store: cronStore,
@@ -49,6 +81,7 @@ const cronService = new CronService({
   clearTimeoutFn: (handle) => clearTimeout(handle),
   runTimeoutMs: config.cron.runTimeoutMs,
   misfireGraceMs: config.cron.misfireGraceMs,
+  execCommand,
 });
 runtime = new PiRuntime(config, {
   extensionFactories: (threadKey) => {

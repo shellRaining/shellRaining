@@ -53,4 +53,52 @@ describe("cron normalize", () => {
       }),
     ).toThrow(/message/i);
   });
+
+  it("normalizes condition command and timeout", async () => {
+    const { normalizeCronJobInput } = await import("../src/cron/normalize.js");
+
+    const job = normalizeCronJobInput({
+      name: "conditional",
+      chatId: 1,
+      threadId: "telegram:1",
+      threadKey: "telegram__1",
+      schedule: { kind: "every", everyMs: 60_000 },
+      payload: { kind: "agentTurn", message: "run" },
+      condition: { command: "  test -f /tmp/ok  ", timeoutMs: 5000 },
+    });
+
+    expect(job.condition).toEqual({ command: "test -f /tmp/ok", timeoutMs: 5000 });
+  });
+
+  it("rejects empty condition commands", async () => {
+    const { normalizeCronJobInput } = await import("../src/cron/normalize.js");
+
+    expect(() =>
+      normalizeCronJobInput({
+        name: "bad",
+        chatId: 1,
+        threadId: "telegram:1",
+        threadKey: "telegram__1",
+        schedule: { kind: "every", everyMs: 60_000 },
+        payload: { kind: "agentTurn", message: "run" },
+        condition: { command: "   " },
+      }),
+    ).toThrow("Cron job condition command is required");
+  });
+
+  it("rejects non-positive condition timeouts", async () => {
+    const { normalizeCronJobInput } = await import("../src/cron/normalize.js");
+
+    expect(() =>
+      normalizeCronJobInput({
+        name: "bad",
+        chatId: 1,
+        threadId: "telegram:1",
+        threadKey: "telegram__1",
+        schedule: { kind: "every", everyMs: 60_000 },
+        payload: { kind: "agentTurn", message: "run" },
+        condition: { command: "true", timeoutMs: 0 },
+      }),
+    ).toThrow("Cron job condition timeout must be a positive integer");
+  });
 });

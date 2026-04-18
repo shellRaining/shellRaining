@@ -50,7 +50,10 @@ export function buildCronExtensionFactory(
     pi.registerTool({
       name: "cron_create",
       label: "Create cron job",
-      description: "Create a scheduled cron job for the current chat thread.",
+      description:
+        "Create a scheduled cron job for the current chat thread. " +
+        "Optional condition: a shell command checked before each run — exit 0 runs the job, exit 1 silently skips, exit 2+ counts as error. " +
+        "Keep condition scripts short and avoid set -e. Only set timeoutMs when the check genuinely takes time.",
       parameters: Type.Object({
         name: Type.String({ minLength: 1 }),
         schedule: Type.Union([
@@ -70,6 +73,12 @@ export function buildCronExtensionFactory(
           kind: Type.Literal("agentTurn"),
           message: Type.String({ minLength: 1 }),
         }),
+        condition: Type.Optional(
+          Type.Object({
+            command: Type.String({ minLength: 1 }),
+            timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
+          }),
+        ),
       }),
       async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
         const job = await service.add(

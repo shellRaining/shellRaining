@@ -14,6 +14,8 @@ type DeliverMock = Mock<Deliver>;
 type WorkspaceForThreadKeyMock = Mock<WorkspaceForThreadKey>;
 type SetTimeoutFnMock = Mock<SetTimeoutFn>;
 type ClearTimeoutFnMock = Mock<ClearTimeoutFn>;
+type ExecCommand = CronServiceDeps["execCommand"];
+type ExecCommandMock = Mock<ExecCommand>;
 
 function createJob(overrides: Partial<CronJob> = {}): CronJob {
   const base: CronJob = {
@@ -71,6 +73,7 @@ describe("CronService", () => {
   let workspaceForThreadKey: WorkspaceForThreadKeyMock;
   let setTimeoutFn: SetTimeoutFnMock;
   let clearTimeoutFn: ClearTimeoutFnMock;
+  let execCommand: ExecCommandMock;
   let timeoutCallback: TimeoutCallback | undefined;
 
   beforeEach(() => {
@@ -86,6 +89,7 @@ describe("CronService", () => {
       return 123 as unknown as ReturnType<typeof setTimeout>;
     });
     clearTimeoutFn = vi.fn<ClearTimeoutFn>(() => undefined);
+    execCommand = vi.fn<ExecCommand>(async () => ({ exitCode: 0 }));
   });
 
   it("recomputes nextRunAtMs for enabled repeating jobs on startup and persists hydration changes", async () => {
@@ -110,6 +114,7 @@ describe("CronService", () => {
       clearTimeoutFn,
       runTimeoutMs: 5_000,
       misfireGraceMs: 5 * 60_000,
+      execCommand,
     });
 
     await service.start();
@@ -152,6 +157,7 @@ describe("CronService", () => {
       clearTimeoutFn,
       runTimeoutMs: 5_000,
       misfireGraceMs: 5 * 60_000,
+      execCommand,
     });
 
     await service.start();
@@ -185,6 +191,7 @@ describe("CronService", () => {
       clearTimeoutFn,
       runTimeoutMs: 5_000,
       misfireGraceMs: 5 * 60_000,
+      execCommand,
     });
     const added = createJob({ state: { consecutiveErrors: 0 } });
 
@@ -227,6 +234,7 @@ describe("CronService", () => {
       clearTimeoutFn,
       runTimeoutMs: 5_000,
       misfireGraceMs: 5 * 60_000,
+      execCommand,
     });
 
     await service.run(oneShot.id);
@@ -262,6 +270,7 @@ describe("CronService", () => {
       clearTimeoutFn,
       runTimeoutMs: 5_000,
       misfireGraceMs: 5 * 60_000,
+      execCommand,
     });
 
     await service.run(repeating.id);
@@ -305,6 +314,7 @@ describe("CronService", () => {
       clearTimeoutFn,
       runTimeoutMs: 5_000,
       misfireGraceMs: 5 * 60_000,
+      execCommand,
     });
 
     await service.run(oneShot.id);
@@ -352,6 +362,7 @@ describe("CronService", () => {
       clearTimeoutFn,
       runTimeoutMs: 5_000,
       misfireGraceMs: 5 * 60_000,
+      execCommand,
     });
 
     await service.start();
@@ -391,5 +402,208 @@ describe("CronService", () => {
       5_000, 60_000,
     ]);
     expect(timeoutCallback).toEqual(expect.any(Function));
+  });
+
+  it("runs the payload when condition exits 0", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    execCommand.mockResolvedValue({ exitCode: 0 });
+    const job = createJob({
+      id: "cond-pass",
+      condition: { command: "test -f marker" },
+      state: { consecutiveErrors: 0, nextRunAtMs: nowMs },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    await service.run(job.id);
+
+    expect(execCommand).toHaveBeenCalledWith("test -f marker", "/mock/workspace", 30_000);
+    expect(runtimePrompt).toHaveBeenCalledTimes(1);
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it("silently skips when condition exits 1", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    execCommand.mockResolvedValue({ exitCode: 1 });
+    const job = createJob({
+      id: "cond-skip",
+      condition: { command: "test -f marker" },
+      state: { consecutiveErrors: 0, nextRunAtMs: nowMs },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    const result = await service.run(job.id);
+
+    expect(runtimePrompt).not.toHaveBeenCalled();
+    expect(deliver).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "cond-skip",
+        state: expect.objectContaining({
+          nextRunAtMs: Date.parse("2026-04-16T09:01:00.000Z"),
+        }),
+      }),
+    );
+  });
+
+  it("treats condition exit codes above 1 as failures", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    execCommand.mockResolvedValue({ exitCode: 2 });
+    const job = createJob({
+      id: "cond-fail",
+      condition: { command: "bad-command" },
+      state: { consecutiveErrors: 0, nextRunAtMs: nowMs },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    const result = await service.run(job.id);
+
+    expect(runtimePrompt).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "cond-fail",
+        state: expect.objectContaining({
+          lastRunStatus: "error",
+          lastError: "Condition command exited with code 2",
+          consecutiveErrors: 1,
+        }),
+      }),
+    );
+  });
+
+  it("treats condition execution exceptions as failures", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    execCommand.mockRejectedValue(new Error("spawn ENOENT"));
+    const job = createJob({
+      id: "cond-exception",
+      condition: { command: "missing-binary" },
+      state: { consecutiveErrors: 0, nextRunAtMs: nowMs },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    const result = await service.run(job.id);
+
+    expect(runtimePrompt).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "cond-exception",
+        state: expect.objectContaining({
+          lastRunStatus: "error",
+          lastError: "spawn ENOENT",
+          consecutiveErrors: 1,
+        }),
+      }),
+    );
+  });
+
+  it("uses the default 30000ms timeout when condition.timeoutMs is omitted", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    execCommand.mockResolvedValue({ exitCode: 0 });
+    const job = createJob({
+      id: "cond-default-timeout",
+      condition: { command: "echo ok" },
+      state: { consecutiveErrors: 0, nextRunAtMs: nowMs },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    await service.run(job.id);
+
+    expect(execCommand).toHaveBeenCalledWith("echo ok", "/mock/workspace", 30_000);
+  });
+
+  it("treats signal-killed condition processes as failures", async () => {
+    const { CronService } = await import("../src/cron/service.js");
+    execCommand.mockResolvedValue({ exitCode: null, signal: "SIGKILL" });
+    const job = createJob({
+      id: "cond-signal",
+      condition: { command: "heavy-command" },
+      state: { consecutiveErrors: 0, nextRunAtMs: nowMs },
+    });
+    const store = createStore([job]);
+    const service = new CronService({
+      store,
+      runtime: { prompt: runtimePrompt },
+      deliver,
+      workspaceForThreadKey,
+      now: () => nowMs,
+      setTimeoutFn,
+      clearTimeoutFn,
+      runTimeoutMs: 5_000,
+      misfireGraceMs: 5 * 60_000,
+      execCommand,
+    });
+
+    const result = await service.run(job.id);
+
+    expect(runtimePrompt).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "cond-signal",
+        state: expect.objectContaining({
+          lastRunStatus: "error",
+          lastError: "Condition command terminated by signal SIGKILL",
+          consecutiveErrors: 1,
+        }),
+      }),
+    );
   });
 });

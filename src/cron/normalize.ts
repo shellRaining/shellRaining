@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import type { CronJob, CronSchedule } from "./types.js";
+import type { CronCondition, CronJob, CronSchedule } from "./types.js";
 
 export interface CronJobInput {
   name: string;
@@ -7,6 +7,7 @@ export interface CronJobInput {
   threadId: string;
   threadKey: string;
   schedule: CronSchedule;
+  condition?: CronCondition;
   payload: {
     kind: "agentTurn";
     message: string;
@@ -29,6 +30,24 @@ export function normalizeCronJobInput(input: CronJobInput): CronJob {
     throw new Error("Cron job chatId must be an integer");
   }
 
+  let condition: CronCondition | undefined;
+  if (input.condition) {
+    const command = input.condition.command.trim();
+    if (!command) {
+      throw new Error("Cron job condition command is required");
+    }
+    if (
+      input.condition.timeoutMs !== undefined &&
+      (!Number.isInteger(input.condition.timeoutMs) || input.condition.timeoutMs <= 0)
+    ) {
+      throw new Error("Cron job condition timeout must be a positive integer");
+    }
+    condition = {
+      command,
+      ...(input.condition.timeoutMs !== undefined && { timeoutMs: input.condition.timeoutMs }),
+    };
+  }
+
   return {
     id: nanoid(),
     name,
@@ -42,6 +61,7 @@ export function normalizeCronJobInput(input: CronJobInput): CronJob {
     deleteAfterRun: input.schedule.kind === "at",
     createdAtMs: Date.now(),
     schedule: input.schedule,
+    condition,
     payload: {
       kind: "agentTurn",
       message,

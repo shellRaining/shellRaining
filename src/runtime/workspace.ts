@@ -59,8 +59,7 @@ export async function getWorkspace(
       if (stats.isDirectory()) {
         return cwd;
       }
-    } catch {
-    }
+    } catch {}
   }
 
   return fallbackWorkspace;
