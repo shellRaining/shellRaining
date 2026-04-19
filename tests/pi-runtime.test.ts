@@ -49,11 +49,6 @@ function createRuntimeConfig() {
       runTimeoutMs: 5 * 60 * 1000,
     },
     port: 1234,
-    serviceProfile: {
-      apiBaseUrl: "https://api.shellraining.xyz",
-      crawlUrl: "https://crawl.shellraining.xyz",
-      vikunjaUrl: "https://todo.shellraining.xyz",
-    },
     showThinking: false,
     skillsDir: "/mock/skills",
     stt: {},
@@ -87,6 +82,21 @@ describe("PiRuntime", () => {
     expect(defaultResourceLoader).toHaveBeenCalledWith(
       expect.objectContaining({ extensionFactories: [extensionFactory] }),
     );
+  });
+
+  it("appends the shellRaining system prompt through the Pi resource loader", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+
+    const options = defaultResourceLoader.mock.calls.at(0)?.at(0) as unknown as {
+      appendSystemPromptOverride?: (base: string[]) => string[];
+    };
+    const result = options.appendSystemPromptOverride?.(["base prompt"]);
+
+    expect(result).toContain("base prompt");
+    expect(result?.at(-1)).toContain("Telegram output is a chat surface");
   });
 
   it("passes image inputs to the Pi session prompt", async () => {

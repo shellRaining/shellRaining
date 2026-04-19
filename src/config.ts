@@ -40,15 +40,6 @@ export interface Config {
     /** Model name to request from the STT service. */
     model?: string;
   };
-  /** URLs for self-hosted services injected into the Pi agent system prompt. */
-  serviceProfile: {
-    /** URL of the crawl service. */
-    crawlUrl: string;
-    /** URL of the Vikunja (task manager) instance. */
-    vikunjaUrl: string;
-    /** URL of the personal API gateway. */
-    apiBaseUrl: string;
-  };
   /** Override base URL for the LLM provider (e.g. for a proxy or compatible API). */
   providerBaseUrl?: string;
 }
@@ -132,11 +123,6 @@ export function loadConfig(): Config {
         ? trimTrailingSlashes(process.env.SHELL_RAINING_STT_BASE_URL.trim())
         : undefined,
       model: process.env.SHELL_RAINING_STT_MODEL?.trim() || undefined,
-    },
-    serviceProfile: {
-      crawlUrl: process.env.SHELL_RAINING_CRAWL_URL?.trim() || "https://crawl.shellraining.xyz",
-      vikunjaUrl: process.env.SHELL_RAINING_VIKUNJA_URL?.trim() || "https://todo.shellraining.xyz",
-      apiBaseUrl: process.env.SHELL_RAINING_API_BASE_URL?.trim() || "https://api.shellraining.xyz",
     },
     providerBaseUrl: process.env.SHELL_RAINING_PROVIDER_BASE_URL?.trim()
       ? trimTrailingSlashes(process.env.SHELL_RAINING_PROVIDER_BASE_URL.trim())

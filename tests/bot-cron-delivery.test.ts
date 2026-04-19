@@ -37,11 +37,6 @@ function createConfig() {
       runTimeoutMs: 5 * 60 * 1000,
     },
     port: 1234,
-    serviceProfile: {
-      apiBaseUrl: "https://api.shellraining.xyz",
-      crawlUrl: "https://crawl.shellraining.xyz",
-      vikunjaUrl: "https://todo.shellraining.xyz",
-    },
     showThinking: false,
     skillsDir: "/mock/skills",
     stt: {},

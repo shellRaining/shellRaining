@@ -9,7 +9,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { getSessionDirectoryForThread } from "./session-store.js";
-import { buildServiceProfileContext, createServiceProfile } from "../runtime/service-profile.js";
+import { buildShellRainingSystemPrompt } from "../system-prompt/index.js";
 
 export interface PiPromptResult {
   artifactsOutput: string;
@@ -87,7 +87,13 @@ export class PiRuntime {
       extensionFactories: this.options.extensionFactories?.(threadKey),
       appendSystemPromptOverride: (base) => [
         ...base,
-        buildServiceProfileContext(createServiceProfile(this.config)),
+        buildShellRainingSystemPrompt({
+          environmentName: "shellRaining",
+          telegram: {
+            inboxDir: "~/.shellRaining/inbox/",
+            outputStyle: "chat",
+          },
+        }),
       ],
     });
     await resourceLoader.reload();
