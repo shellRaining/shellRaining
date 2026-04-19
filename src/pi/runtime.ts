@@ -89,6 +89,10 @@ export class PiRuntime {
         ...base,
         buildShellRainingSystemPrompt({
           environmentName: "shellRaining",
+          skills: {
+            enabled: true,
+            readToolName: "read",
+          },
           telegram: {
             inboxDir: "~/.shellRaining/inbox/",
             outputStyle: "chat",
