@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const runtimePrompt = vi.fn<(...args: any[]) => Promise<{ text: string }>>(async () => ({ text: "done" }));
+const runtimePrompt = vi.fn<(...args: any[]) => Promise<{ text: string }>>(async () => ({
+  text: "done",
+}));
 const isRunning = vi.fn(() => false);
 const steer = vi.fn<(...args: any[]) => Promise<{ text: string }>>(async () => ({ text: "done" }));
 const startTyping = vi.fn(async () => undefined);

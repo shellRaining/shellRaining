@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildShellRainingSystemPrompt } from "../src/system-prompt/index.js";
-import type { SystemPromptContext } from "../src/system-prompt/index.js";
+import { buildShellRainingSystemPrompt } from "../src/index.js";
+import type { SystemPromptContext } from "../src/index.js";
 
 function createContext(): SystemPromptContext {
   return {

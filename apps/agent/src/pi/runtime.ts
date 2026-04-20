@@ -9,7 +9,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { getSessionDirectoryForThread } from "./session-store.js";
-import { buildShellRainingSystemPrompt } from "../system-prompt/index.js";
+import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
 
 export interface PiPromptResult {
   artifactsOutput: string;

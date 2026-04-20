@@ -1,36 +1,20 @@
 {
-  "name": "shellRaining",
+  "name": "shellraining-workspace",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsgo -p tsconfig.json",
-    "start": "node dist/src/index.js",
-    "typecheck": "tsgo --noEmit",
+    "dev": "pnpm --filter @shellraining/agent dev",
+    "build": "pnpm --filter @shellraining/system-prompt build && pnpm --filter @shellraining/agent build",
+    "start": "pnpm --filter @shellraining/agent start",
+    "typecheck": "pnpm --filter @shellraining/system-prompt typecheck && pnpm --filter @shellraining/system-prompt build && pnpm --filter @shellraining/agent typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "check": "oxlint && oxfmt --check"
-  },
-  "dependencies": {
-    "@chat-adapter/shared": "link:../chat-telegramify/packages/adapter-shared",
-    "@chat-adapter/state-memory": "^4.24.0",
-    "@chat-adapter/telegram": "link:../chat-telegramify/packages/adapter-telegram",
-    "@hono/node-server": "^1.14.1",
-    "@mariozechner/pi-coding-agent": "^0.62.0",
-    "@sinclair/typebox": "^0.34.41",
-    "chat": "link:../chat-telegramify/packages/chat",
-    "croner": "^9.1.0",
-    "dotenv": "^16.6.1",
-    "hono": "^4.12.5",
-    "luxon": "^3.7.2",
-    "nanoid": "^5.1.5",
-    "telegramify": "link:../chat-telegramify/packages/telegramify",
-    "undici": "^7.16.0"
+    "check": "oxlint && oxfmt --check && pnpm typecheck"
   },
   "devDependencies": {
     "@types/luxon": "^3.7.1",
@@ -44,11 +28,6 @@
   },
   "packageManager": "pnpm@10.30.3",
   "pnpm": {
-    "overrides": {
-      "@chat-adapter/shared": "link:../chat-telegramify/packages/adapter-shared",
-      "chat": "link:../chat-telegramify/packages/chat",
-      "telegramify": "link:../chat-telegramify/packages/telegramify"
-    },
     "onlyBuiltDependencies": [
       "esbuild",
       "koffi",
