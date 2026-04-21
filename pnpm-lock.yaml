@@ -39,8 +39,8 @@ importers:
         specifier: ^4.26.0
         version: 4.26.0
       '@chat-adapter/telegram':
-        specifier: npm:@shellraining/chat-adapter-telegram@4.24.0
-        version: '@shellraining/chat-adapter-telegram@4.24.0'
+        specifier: npm:@shellraining/chat-adapter-telegram@4.24.2
+        version: '@shellraining/chat-adapter-telegram@4.24.2'
       '@hono/node-server':
         specifier: ^1.14.1
         version: 1.19.13(hono@4.12.12)
@@ -921,8 +921,8 @@ packages:
   '@rolldown/pluginutils@1.0.0-rc.13':
     resolution: {integrity: sha512-3ngTAv6F/Py35BsYbeeLeecvhMKdsKm4AoOETVhAA+Qc8nrA2I0kF7oa93mE9qnIurngOSpMnQ0x2nQY2FPviA==}
 
-  '@shellraining/chat-adapter-telegram@4.24.0':
-    resolution: {integrity: sha512-vy6qOCB6Be5IdvjrBcL75Pe6T2vkU2ZwkET3T6Gcxwb6bj+/GX+OTGn8sBjwDKgZ5PMc8RnB7lan0y4gG9a5tA==}
+  '@shellraining/chat-adapter-telegram@4.24.2':
+    resolution: {integrity: sha512-8WqbZHMlDdIZZKBsdUuGzijmRWJRlY6nuKGLANSHZYyS4Ya0DnN7RbdtGJvn2i27iRSXqUtfM37ijULNqwhzig==}
 
   '@silvia-odwyer/photon-node@0.3.4':
     resolution: {integrity: sha512-bnly4BKB3KDTFxrUIcgCLbaeVVS8lrAkri1pEzskpmxu9MdfGQTy8b8EgcD83ywD3RPMsIulY8xJH5Awa+t9fA==}
@@ -2067,8 +2067,8 @@ packages:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
     engines: {node: '>=8'}
 
-  telegramify@0.1.0:
-    resolution: {integrity: sha512-Lf+O01EkNWvdHh+OwJUzxBtP2K2DDgZBNN2FuuVejEFZG7hWvER8BhIfwfEwmjG9owaKEPuqwr3eN1tVyiUOOg==}
+  telegramify@0.1.1:
+    resolution: {integrity: sha512-m4rweq+PFcJMbKSecwOig0ZCgozAsqLO3TEv9jgibOrEy2+6MbLd0cWG36T2QsiwBCZR8Uscr5VT4CX6o4K2bQ==}
 
   thenify-all@1.6.0:
     resolution: {integrity: sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA==}
@@ -3160,11 +3160,11 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.0-rc.13': {}
 
-  '@shellraining/chat-adapter-telegram@4.24.0':
+  '@shellraining/chat-adapter-telegram@4.24.2':
     dependencies:
       '@chat-adapter/shared': 4.26.0
       chat: 4.26.0
-      telegramify: 0.1.0
+      telegramify: 0.1.1
     transitivePeerDependencies:
       - supports-color
 
@@ -4639,7 +4639,7 @@ snapshots:
     dependencies:
       has-flag: 4.0.0
 
-  telegramify@0.1.0:
+  telegramify@0.1.1:
     dependencies:
       chat: 4.26.0
     transitivePeerDependencies:
