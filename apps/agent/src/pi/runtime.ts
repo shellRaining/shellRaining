@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -8,8 +9,9 @@ import {
   type SessionInfo,
 } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
-import { getSessionDirectoryForThread } from "./session-store.js";
 import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
+import { SkillWatcher } from "./skill-watcher.js";
+import { getSessionDirectoryForThread } from "./session-store.js";
 
 export interface PiPromptResult {
   artifactsOutput: string;
@@ -67,6 +69,7 @@ export class PiRuntime {
    * await the running promise when injecting a mid-session message.
    */
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
+  private skillWatcher: SkillWatcher | undefined;
 
   constructor(
     private readonly config: Config,
@@ -89,10 +92,6 @@ export class PiRuntime {
         ...base,
         buildShellRainingSystemPrompt({
           environmentName: "shellRaining",
-          skills: {
-            enabled: true,
-            readToolName: "read",
-          },
           telegram: {
             inboxDir: "~/.shellRaining/inbox/",
             outputStyle: "chat",
@@ -120,7 +119,33 @@ export class PiRuntime {
 
     const cached = { cwd, session };
     this.sessions.set(threadKey, cached);
+
+    await this.ensureSkillWatcher(cwd, resourceLoader, session);
+
     return cached;
+  }
+
+  private async ensureSkillWatcher(
+    cwd: string,
+    resourceLoader: DefaultResourceLoader,
+    session: Awaited<ReturnType<typeof createAgentSession>>["session"],
+  ): Promise<void> {
+    const projectSkillsDir = join(cwd, ".claude", "skills");
+    const agentSkillsDir = join(this.config.agentDir, "skills");
+
+    if (!this.skillWatcher) {
+      this.skillWatcher = new SkillWatcher({
+        paths: [this.config.skillsDir, agentSkillsDir, projectSkillsDir],
+        debounceMs: 500,
+        onReload: async () => {
+          await resourceLoader.reload();
+          session.setActiveToolsByName(session.getActiveToolNames());
+        },
+      });
+      return;
+    }
+
+    await this.skillWatcher.addPath(projectSkillsDir);
   }
 
   private async getOrCreateSession(threadKey: string, cwd: string): Promise<CachedSession> {
@@ -271,5 +296,14 @@ export class PiRuntime {
     } finally {
       unsubscribe();
     }
+  }
+
+  async dispose(): Promise<void> {
+    for (const { session } of this.sessions.values()) {
+      session.dispose();
+    }
+    this.sessions.clear();
+    await this.skillWatcher?.dispose();
+    this.skillWatcher = undefined;
   }
 }

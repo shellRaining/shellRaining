@@ -6,12 +6,22 @@ const sessionPrompt = vi.fn();
 const sessionSubscribe = vi.fn((_listener: SessionListener) => () => undefined);
 const sessionDispose = vi.fn();
 const sessionNewSession = vi.fn();
+const sessionGetActiveToolNames = vi.fn(() => ["read", "bash"]);
+const sessionSetActiveToolsByName = vi.fn();
 const sessionManagerContinueRecent = vi.fn(() => ({ mode: "recent" }));
 const sessionManagerCreate = vi.fn(() => ({ mode: "new" }));
 const resourceLoaderReload = vi.fn(async () => undefined);
 const defaultResourceLoader = vi.fn(function DefaultResourceLoaderMock() {
   return {
     reload: resourceLoaderReload,
+  };
+});
+const skillWatcherAddPath = vi.fn(async () => undefined);
+const skillWatcherDispose = vi.fn(async () => undefined);
+const skillWatcherCtor = vi.fn(function SkillWatcherMock() {
+  return {
+    addPath: skillWatcherAddPath,
+    dispose: skillWatcherDispose,
   };
 });
 
@@ -23,9 +33,11 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   createAgentSession: vi.fn(async () => ({
     session: {
       dispose: sessionDispose,
+      getActiveToolNames: sessionGetActiveToolNames,
       listSessions: vi.fn(),
       newSession: sessionNewSession,
       prompt: sessionPrompt,
+      setActiveToolsByName: sessionSetActiveToolsByName,
       subscribe: sessionSubscribe,
       switchSession: vi.fn(),
     },
@@ -36,6 +48,10 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
     create: sessionManagerCreate,
     list: vi.fn(() => []),
   },
+}));
+
+vi.mock("../src/pi/skill-watcher.js", () => ({
+  SkillWatcher: skillWatcherCtor,
 }));
 
 function createRuntimeConfig() {
@@ -66,6 +82,16 @@ describe("PiRuntime", () => {
     sessionManagerContinueRecent.mockReturnValue({ mode: "recent" });
     sessionManagerCreate.mockReturnValue({ mode: "new" });
     resourceLoaderReload.mockResolvedValue(undefined);
+    sessionGetActiveToolNames.mockReturnValue(["read", "bash"]);
+    sessionSetActiveToolsByName.mockReturnValue(undefined);
+    skillWatcherAddPath.mockResolvedValue(undefined);
+    skillWatcherDispose.mockResolvedValue(undefined);
+    skillWatcherCtor.mockImplementation(function SkillWatcherMock() {
+      return {
+        addPath: skillWatcherAddPath,
+        dispose: skillWatcherDispose,
+      };
+    });
   });
 
   it("passes extension factories from builder into the Pi resource loader", async () => {
@@ -97,7 +123,7 @@ describe("PiRuntime", () => {
 
     expect(result).toContain("base prompt");
     expect(result?.at(-1)).toContain("Telegram output is a chat surface");
-    expect(result?.at(-1)).toContain("Pi may append an <available_skills> catalog later");
+    expect(result?.at(-1)).not.toContain("Pi may append an <available_skills> catalog later");
   });
 
   it("passes image inputs to the Pi session prompt", async () => {
@@ -159,5 +185,46 @@ describe("PiRuntime", () => {
       error: errorMessage,
       text: "",
     });
+  });
+
+  it("registers all skill directories when creating a session", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+
+    expect(skillWatcherCtor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paths: ["/mock/skills", "/mock/agent/skills", "/mock/workspace/.claude/skills"],
+        debounceMs: 500,
+      }),
+    );
+  });
+
+  it("reloads the resource loader and rebuilds the system prompt after skill changes", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+
+    const options = skillWatcherCtor.mock.calls.at(0)?.at(0) as unknown as {
+      onReload: () => Promise<void>;
+    };
+    await options.onReload();
+
+    expect(resourceLoaderReload).toHaveBeenCalledTimes(2);
+    expect(sessionGetActiveToolNames).toHaveBeenCalledTimes(1);
+    expect(sessionSetActiveToolsByName).toHaveBeenCalledWith(["read", "bash"]);
+  });
+
+  it("disposes sessions and the skill watcher", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+    await runtime.dispose();
+
+    expect(sessionDispose).toHaveBeenCalledTimes(1);
+    expect(skillWatcherDispose).toHaveBeenCalledTimes(1);
   });
 });

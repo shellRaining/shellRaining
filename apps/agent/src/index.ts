@@ -13,7 +13,7 @@ import { getThreadIdFromKey, getChatIdFromThreadKey } from "./pi/session-store.j
 import { syncPiSettings } from "./runtime/pi-settings.js";
 import { getWorkspace } from "./runtime/workspace.js";
 
-loadEnv();
+loadEnv({ path: "../../.env" });
 
 // When running behind an HTTP proxy (e.g. in a container), undici needs explicit
 // global dispatcher setup — Node's built-in fetch doesn't respect *_PROXY env vars.
@@ -91,6 +91,27 @@ runtime = new PiRuntime(config, {
   },
 });
 const botRuntime = createBot(config, runtime);
+
+let shuttingDown = false;
+
+async function shutdown(signal: string) {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+  console.error(`[shellRaining] shutting down on ${signal}`);
+  await runtime.dispose();
+  process.exit(0);
+}
+
+process.on("SIGINT", () => {
+  void shutdown("SIGINT");
+});
+
+process.on("SIGTERM", () => {
+  void shutdown("SIGTERM");
+});
+
 await cronService.start();
 const app = new Hono();
 
