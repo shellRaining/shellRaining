@@ -254,13 +254,9 @@ async function handlePrompt(
   const promptText = injectPromptTimestampPrefix(normalized.text);
 
   if (runtime.isRunning(threadKey)) {
-    const result = await runtime.steer(threadKey, promptText, normalized.images);
-    if (result.error) {
-      await thread.post(`执行失败：${result.error}`);
-    }
-    if (result.text) {
-      await replyLong(thread, result.text);
-    }
+    // 消息注入到正在运行的 session，最终回复由最初那条 prompt 的 handler 统一发送，
+    // 这里必须 return，避免两条 handler 都对同一份输出调用 replyLong 造成重复回复。
+    await runtime.steer(threadKey, promptText, normalized.images);
     return;
   }
 

@@ -189,20 +189,20 @@ export class PiRuntime {
 
   /**
    * Inject a message into an already-running session (used for mid-turn
-   * steering). Throws if no session or no inflight prompt exists for the thread.
-   * Returns the inflight prompt's result once it completes.
+   * steering). Returns once the message has been queued into the session; the
+   * inflight prompt's final reply is delivered by the original `prompt()`
+   * caller, so this method deliberately does not await or return it to avoid
+   * double-sending the same output to the user.
    */
-  async steer(threadKey: string, text: string, images?: PiImageInput[]): Promise<PiPromptResult> {
+  async steer(threadKey: string, text: string, images?: PiImageInput[]): Promise<void> {
     const cached = this.sessions.get(threadKey);
     if (!cached) {
       throw new Error(`No active session for thread: ${threadKey}`);
     }
-    await cached.session.steer(text, images);
-    const running = this.inflight.get(threadKey);
-    if (!running) {
+    if (!this.inflight.has(threadKey)) {
       throw new Error(`No inflight prompt for thread: ${threadKey}`);
     }
-    return running;
+    await cached.session.steer(text, images);
   }
 
   /**

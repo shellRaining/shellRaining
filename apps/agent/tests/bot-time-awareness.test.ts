@@ -4,7 +4,7 @@ const runtimePrompt = vi.fn<(...args: any[]) => Promise<{ text: string }>>(async
   text: "done",
 }));
 const isRunning = vi.fn(() => false);
-const steer = vi.fn<(...args: any[]) => Promise<{ text: string }>>(async () => ({ text: "done" }));
+const steer = vi.fn<(...args: any[]) => Promise<void>>(async () => undefined);
 const startTyping = vi.fn(async () => undefined);
 const post = vi.fn(async () => undefined);
 const subscribe = vi.fn(async () => undefined);
