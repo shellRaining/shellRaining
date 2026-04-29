@@ -10,7 +10,6 @@ import type { AgentCronJob, AgentCronOwner, AgentCronPayload } from "./cron/type
 import { PiRuntime } from "./pi/runtime.js";
 import { getThreadIdFromKey, getChatIdFromThreadKey } from "./pi/session-store.js";
 import { appendCurrentTimeLine } from "./runtime/time-awareness.js";
-import { syncPiSettings } from "./runtime/pi-settings.js";
 import { getWorkspace } from "./runtime/workspace.js";
 
 loadEnv({ path: "../../.env" });
@@ -31,12 +30,6 @@ if (
 }
 
 const config = loadConfig();
-await syncPiSettings({
-  agentDir: config.agentDir,
-  backupDir: `${config.baseDir}/backups`,
-  skillsDir: config.skillsDir,
-});
-
 const cronStore = new CronStore<AgentCronPayload, AgentCronOwner>(config.cron.jobsPath);
 
 async function execCommand(command: string, cwd: string, timeoutMs: number) {

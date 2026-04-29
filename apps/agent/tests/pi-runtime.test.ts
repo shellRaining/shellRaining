@@ -24,6 +24,19 @@ const skillWatcherCtor = vi.fn(function SkillWatcherMock() {
     dispose: skillWatcherDispose,
   };
 });
+const loadSkills = vi.fn(() => ({
+  diagnostics: [],
+  skills: [
+    {
+      baseDir: "/mock/skills/example",
+      description: "Example skill",
+      disableModelInvocation: false,
+      filePath: "/mock/skills/example/SKILL.md",
+      name: "example",
+      sourceInfo: { source: "test" },
+    },
+  ],
+}));
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(async () => undefined),
@@ -43,6 +56,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
     },
   })),
   DefaultResourceLoader: defaultResourceLoader,
+  loadSkills,
   SessionManager: {
     continueRecent: sessionManagerContinueRecent,
     create: sessionManagerCreate,
@@ -86,6 +100,19 @@ describe("PiRuntime", () => {
     sessionSetActiveToolsByName.mockReturnValue(undefined);
     skillWatcherAddPath.mockResolvedValue(undefined);
     skillWatcherDispose.mockResolvedValue(undefined);
+    loadSkills.mockReturnValue({
+      diagnostics: [],
+      skills: [
+        {
+          baseDir: "/mock/skills/example",
+          description: "Example skill",
+          disableModelInvocation: false,
+          filePath: "/mock/skills/example/SKILL.md",
+          name: "example",
+          sourceInfo: { source: "test" },
+        },
+      ],
+    });
     skillWatcherCtor.mockImplementation(function SkillWatcherMock() {
       return {
         addPath: skillWatcherAddPath,
@@ -108,6 +135,41 @@ describe("PiRuntime", () => {
     expect(defaultResourceLoader).toHaveBeenCalledWith(
       expect.objectContaining({ extensionFactories: [extensionFactory] }),
     );
+  });
+
+  it("loads only configured shellRaining skills through the Pi resource loader", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+
+    expect(loadSkills).toHaveBeenCalledWith({
+      includeDefaults: false,
+      skillPaths: ["/mock/skills"],
+    });
+
+    const options = defaultResourceLoader.mock.calls.at(0)?.at(0) as unknown as {
+      noSkills?: boolean;
+      skillsOverride?: (base: { diagnostics: unknown[]; skills: unknown[] }) => {
+        diagnostics: unknown[];
+        skills: unknown[];
+      };
+    };
+
+    expect(options.noSkills).toBe(true);
+    expect(options.skillsOverride?.({ diagnostics: [], skills: [] })).toEqual({
+      diagnostics: [],
+      skills: [
+        {
+          baseDir: "/mock/skills/example",
+          description: "Example skill",
+          disableModelInvocation: false,
+          filePath: "/mock/skills/example/SKILL.md",
+          name: "example",
+          sourceInfo: { source: "test" },
+        },
+      ],
+    });
   });
 
   it("appends the shellRaining system prompt through the Pi resource loader", async () => {
@@ -187,7 +249,7 @@ describe("PiRuntime", () => {
     });
   });
 
-  it("registers all skill directories when creating a session", async () => {
+  it("watches only the configured shellRaining skills directory", async () => {
     const { PiRuntime } = await import("../src/pi/runtime.js");
     const runtime = new PiRuntime(createRuntimeConfig());
 
@@ -195,7 +257,7 @@ describe("PiRuntime", () => {
 
     expect(skillWatcherCtor).toHaveBeenCalledWith(
       expect.objectContaining({
-        paths: ["/mock/skills", "/mock/agent/skills", "/mock/workspace/.claude/skills"],
+        paths: ["/mock/skills"],
         debounceMs: 500,
       }),
     );

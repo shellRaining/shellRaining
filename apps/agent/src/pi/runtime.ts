@@ -1,5 +1,4 @@
 import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -7,6 +6,7 @@ import {
   type AgentSessionEvent,
   type ExtensionFactory,
   type SessionInfo,
+  loadSkills,
 } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
@@ -83,11 +83,17 @@ export class PiRuntime {
   ): Promise<CachedSession> {
     const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
     await mkdir(sessionDir, { recursive: true });
+    const shellRainingSkills = loadSkills({
+      includeDefaults: false,
+      skillPaths: [this.config.skillsDir],
+    });
 
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir: this.config.agentDir,
       extensionFactories: this.options.extensionFactories?.(threadKey),
+      noSkills: true,
+      skillsOverride: () => shellRainingSkills,
       appendSystemPromptOverride: (base) => [
         ...base,
         buildShellRainingSystemPrompt({
@@ -120,22 +126,18 @@ export class PiRuntime {
     const cached = { cwd, session };
     this.sessions.set(threadKey, cached);
 
-    await this.ensureSkillWatcher(cwd, resourceLoader, session);
+    await this.ensureSkillWatcher(resourceLoader, session);
 
     return cached;
   }
 
   private async ensureSkillWatcher(
-    cwd: string,
     resourceLoader: DefaultResourceLoader,
     session: Awaited<ReturnType<typeof createAgentSession>>["session"],
   ): Promise<void> {
-    const projectSkillsDir = join(cwd, ".claude", "skills");
-    const agentSkillsDir = join(this.config.agentDir, "skills");
-
     if (!this.skillWatcher) {
       this.skillWatcher = new SkillWatcher({
-        paths: [this.config.skillsDir, agentSkillsDir, projectSkillsDir],
+        paths: [this.config.skillsDir],
         debounceMs: 500,
         onReload: async () => {
           await resourceLoader.reload();
@@ -144,8 +146,6 @@ export class PiRuntime {
       });
       return;
     }
-
-    await this.skillWatcher.addPath(projectSkillsDir);
   }
 
   private async getOrCreateSession(threadKey: string, cwd: string): Promise<CachedSession> {
