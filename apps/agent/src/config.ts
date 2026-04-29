@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -42,6 +43,44 @@ export interface Config {
   };
   /** Override base URL for the LLM provider (e.g. for a proxy or compatible API). */
   providerBaseUrl?: string;
+  /** Pi-compatible files owned by shellRaining's agent directory. */
+  pi: {
+    settingsPath: string;
+    authPath: string;
+    modelsPath: string;
+  };
+}
+
+interface ShellRainingConfigFile {
+  server?: {
+    port?: number;
+  };
+  telegram?: {
+    botToken?: string;
+    apiBaseUrl?: string;
+    webhookSecret?: string;
+    allowedUsers?: number[];
+  };
+  paths?: {
+    baseDir?: string;
+    workspace?: string;
+    agentDir?: string;
+    skillsDir?: string;
+  };
+  agent?: {
+    showThinking?: boolean;
+    providerBaseUrl?: string;
+  };
+  cron?: {
+    jobsPath?: string;
+    runTimeoutMs?: number;
+    misfireGraceMs?: number;
+  };
+  stt?: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  };
 }
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
@@ -67,6 +106,63 @@ function trimTrailingSlashes(value: string): string {
   return value.slice(0, end);
 }
 
+function expandHome(path: string, home = homedir()): string {
+  if (path === "~") {
+    return home;
+  }
+  if (path.startsWith("~/")) {
+    return join(home, path.slice(2));
+  }
+  return path;
+}
+
+function resolveConfigValue(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (trimmed.startsWith("env:")) {
+    return process.env[trimmed.slice("env:".length)]?.trim() || undefined;
+  }
+
+  return trimmed;
+}
+
+function firstString(...values: Array<string | undefined>): string | undefined {
+  for (const value of values) {
+    const resolved = resolveConfigValue(value);
+    if (resolved) {
+      return resolved;
+    }
+  }
+  return undefined;
+}
+
+function firstNumber(...values: Array<number | undefined>): number | undefined {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function loadConfigFile(): ShellRainingConfigFile {
+  const configPath = expandHome(
+    process.env.SHELL_RAINING_CONFIG?.trim() || join(homedir(), ".shellRaining", "config.json"),
+  );
+  if (!existsSync(configPath)) {
+    return {};
+  }
+
+  return JSON.parse(readFileSync(configPath, "utf-8")) as ShellRainingConfigFile;
+}
+
 function parseCronNumber(value: string | undefined, defaultValue: number): number {
   if (!value) {
     return defaultValue;
@@ -77,55 +173,101 @@ function parseCronNumber(value: string | undefined, defaultValue: number): numbe
 }
 
 export function loadConfig(): Config {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const fileConfig = loadConfigFile();
+  const token = firstString(process.env.TELEGRAM_BOT_TOKEN, fileConfig.telegram?.botToken);
   if (!token) {
     throw new Error("TELEGRAM_BOT_TOKEN is required. Set it in .env file.");
   }
 
   const home = homedir();
-  const baseDir = process.env.SHELL_RAINING_BASE_DIR?.trim() || join(home, ".shellRaining");
-  const workspace =
-    process.env.SHELL_RAINING_WORKSPACE?.trim() || join(home, "shellRaining-workspace");
-  const agentDir = process.env.SHELL_RAINING_AGENT_DIR?.trim() || join(home, ".pi", "agent");
-  const skillsDir =
-    process.env.SHELL_RAINING_SKILLS_DIR?.trim() || join(home, "Documents", "dotfiles", "skills");
+  const baseDir = expandHome(
+    firstString(process.env.SHELL_RAINING_BASE_DIR, fileConfig.paths?.baseDir) ||
+      join(home, ".shellRaining"),
+    home,
+  );
+  const workspace = expandHome(
+    firstString(process.env.SHELL_RAINING_WORKSPACE, fileConfig.paths?.workspace) ||
+      join(home, "shellRaining-workspace"),
+    home,
+  );
+  const agentDir = expandHome(
+    firstString(process.env.SHELL_RAINING_AGENT_DIR, fileConfig.paths?.agentDir) ||
+      join(baseDir, "agent"),
+    home,
+  );
+  const skillsDir = expandHome(
+    firstString(process.env.SHELL_RAINING_SKILLS_DIR, fileConfig.paths?.skillsDir) ||
+      join(home, "Documents", "dotfiles", "skills"),
+    home,
+  );
   const allowedUsers = process.env.SHELL_RAINING_ALLOWED_USERS?.trim()
     ? process.env.SHELL_RAINING_ALLOWED_USERS.split(",")
         .map((id) => Number.parseInt(id.trim(), 10))
         .filter((id) => !Number.isNaN(id))
-    : [];
+    : fileConfig.telegram?.allowedUsers ?? [];
+  const port = process.env.SHELL_RAINING_PORT
+    ? Number.parseInt(process.env.SHELL_RAINING_PORT, 10)
+    : firstNumber(fileConfig.server?.port) ?? 3457;
 
   return {
     telegramToken: token,
-    telegramApiBaseUrl: process.env.TELEGRAM_API_BASE_URL?.trim()
-      ? trimTrailingSlashes(process.env.TELEGRAM_API_BASE_URL.trim())
+    telegramApiBaseUrl: firstString(
+      process.env.TELEGRAM_API_BASE_URL,
+      fileConfig.telegram?.apiBaseUrl,
+    )
+      ? trimTrailingSlashes(
+          firstString(process.env.TELEGRAM_API_BASE_URL, fileConfig.telegram?.apiBaseUrl) ?? "",
+        )
       : undefined,
-    telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET?.trim() || undefined,
-    port: Number.parseInt(process.env.SHELL_RAINING_PORT || "3457", 10),
+    telegramWebhookSecret: firstString(
+      process.env.TELEGRAM_WEBHOOK_SECRET,
+      fileConfig.telegram?.webhookSecret,
+    ),
+    port,
     baseDir,
     workspace,
     agentDir,
     skillsDir,
     allowedUsers,
-    showThinking: parseBoolean(process.env.SHELL_RAINING_SHOW_THINKING, false),
+    showThinking: parseBoolean(
+      process.env.SHELL_RAINING_SHOW_THINKING,
+      fileConfig.agent?.showThinking ?? false,
+    ),
     cron: {
       jobsPath:
-        process.env.SHELL_RAINING_CRON_JOBS_PATH?.trim() || join(baseDir, "cron", "jobs.json"),
-      runTimeoutMs: parseCronNumber(process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS, 5 * 60 * 1000),
+        firstString(process.env.SHELL_RAINING_CRON_JOBS_PATH, fileConfig.cron?.jobsPath) ||
+        join(baseDir, "cron", "jobs.json"),
+      runTimeoutMs: parseCronNumber(
+        process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS,
+        firstNumber(fileConfig.cron?.runTimeoutMs) ?? 5 * 60 * 1000,
+      ),
       misfireGraceMs: parseCronNumber(
         process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS,
-        5 * 60 * 1000,
+        firstNumber(fileConfig.cron?.misfireGraceMs) ?? 5 * 60 * 1000,
       ),
     },
     stt: {
-      apiKey: process.env.SHELL_RAINING_STT_API_KEY?.trim() || undefined,
-      baseUrl: process.env.SHELL_RAINING_STT_BASE_URL?.trim()
-        ? trimTrailingSlashes(process.env.SHELL_RAINING_STT_BASE_URL.trim())
+      apiKey: firstString(process.env.SHELL_RAINING_STT_API_KEY, fileConfig.stt?.apiKey),
+      baseUrl: firstString(process.env.SHELL_RAINING_STT_BASE_URL, fileConfig.stt?.baseUrl)
+        ? trimTrailingSlashes(
+            firstString(process.env.SHELL_RAINING_STT_BASE_URL, fileConfig.stt?.baseUrl) ?? "",
+          )
         : undefined,
-      model: process.env.SHELL_RAINING_STT_MODEL?.trim() || undefined,
+      model: firstString(process.env.SHELL_RAINING_STT_MODEL, fileConfig.stt?.model),
     },
-    providerBaseUrl: process.env.SHELL_RAINING_PROVIDER_BASE_URL?.trim()
-      ? trimTrailingSlashes(process.env.SHELL_RAINING_PROVIDER_BASE_URL.trim())
+    providerBaseUrl: firstString(
+      process.env.SHELL_RAINING_PROVIDER_BASE_URL,
+      fileConfig.agent?.providerBaseUrl,
+    )
+      ? trimTrailingSlashes(
+          firstString(process.env.SHELL_RAINING_PROVIDER_BASE_URL, fileConfig.agent?.providerBaseUrl) ??
+            "",
+        )
       : undefined,
+    pi: {
+      settingsPath: join(agentDir, "settings.json"),
+      authPath: join(agentDir, "auth.json"),
+      modelsPath: join(agentDir, "models.json"),
+    },
   };
 }

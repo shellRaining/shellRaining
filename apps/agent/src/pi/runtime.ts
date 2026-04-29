@@ -1,8 +1,11 @@
 import { mkdir } from "node:fs/promises";
 import {
   createAgentSession,
+  AuthStorage,
   DefaultResourceLoader,
+  ModelRegistry,
   SessionManager,
+  SettingsManager,
   type AgentSessionEvent,
   type ExtensionFactory,
   type SessionInfo,
@@ -87,10 +90,20 @@ export class PiRuntime {
       includeDefaults: false,
       skillPaths: [this.config.skillsDir],
     });
+    const authStorage = AuthStorage.create(this.config.pi.authPath);
+    const modelRegistry = new ModelRegistry(authStorage, this.config.pi.modelsPath);
+    const settingsManager = SettingsManager.create(cwd, this.config.agentDir);
+
+    if (this.config.providerBaseUrl) {
+      modelRegistry.registerProvider("shellraining", {
+        baseUrl: this.config.providerBaseUrl,
+      });
+    }
 
     const resourceLoader = new DefaultResourceLoader({
       cwd,
       agentDir: this.config.agentDir,
+      settingsManager,
       extensionFactories: this.options.extensionFactories?.(threadKey),
       noSkills: true,
       skillsOverride: () => shellRainingSkills,
@@ -110,18 +123,15 @@ export class PiRuntime {
     const { session } = await createAgentSession({
       cwd,
       agentDir: this.config.agentDir,
+      authStorage,
+      modelRegistry,
+      settingsManager,
       resourceLoader,
       sessionManager:
         mode === "new"
           ? SessionManager.create(cwd, sessionDir)
           : SessionManager.continueRecent(cwd, sessionDir),
     });
-
-    if (this.config.providerBaseUrl) {
-      session.modelRegistry.registerProvider("shellraining", {
-        baseUrl: this.config.providerBaseUrl,
-      });
-    }
 
     const cached = { cwd, session };
     this.sessions.set(threadKey, cached);

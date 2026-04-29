@@ -79,6 +79,11 @@ function createConfig() {
       misfireGraceMs: 5 * 60 * 1000,
       runTimeoutMs: 5 * 60 * 1000,
     },
+    pi: {
+      settingsPath: "/mock/agent/settings.json",
+      authPath: "/mock/agent/auth.json",
+      modelsPath: "/mock/agent/models.json",
+    },
     port: 1234,
     showThinking: false,
     skillsDir: "/mock/skills",

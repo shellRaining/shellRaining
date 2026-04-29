@@ -16,6 +16,12 @@ const defaultResourceLoader = vi.fn(function DefaultResourceLoaderMock() {
     reload: resourceLoaderReload,
   };
 });
+const registerProvider = vi.fn();
+const authStorageCreate = vi.fn(() => ({ kind: "auth" }));
+const modelRegistryCtor = vi.fn(function ModelRegistryMock() {
+  return { kind: "models", registerProvider };
+});
+const settingsManagerCreate = vi.fn(() => ({ kind: "settings" }));
 const skillWatcherAddPath = vi.fn(async () => undefined);
 const skillWatcherDispose = vi.fn(async () => undefined);
 const skillWatcherCtor = vi.fn(function SkillWatcherMock() {
@@ -43,6 +49,7 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
+  AuthStorage: { create: authStorageCreate },
   createAgentSession: vi.fn(async () => ({
     session: {
       dispose: sessionDispose,
@@ -57,6 +64,8 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   })),
   DefaultResourceLoader: defaultResourceLoader,
   loadSkills,
+  ModelRegistry: modelRegistryCtor,
+  SettingsManager: { create: settingsManagerCreate },
   SessionManager: {
     continueRecent: sessionManagerContinueRecent,
     create: sessionManagerCreate,
@@ -78,6 +87,11 @@ function createRuntimeConfig() {
       misfireGraceMs: 5 * 60 * 1000,
       runTimeoutMs: 5 * 60 * 1000,
     },
+    pi: {
+      settingsPath: "/mock/base/agent/settings.json",
+      authPath: "/mock/base/agent/auth.json",
+      modelsPath: "/mock/base/agent/models.json",
+    },
     port: 1234,
     showThinking: false,
     skillsDir: "/mock/skills",
@@ -98,6 +112,12 @@ describe("PiRuntime", () => {
     resourceLoaderReload.mockResolvedValue(undefined);
     sessionGetActiveToolNames.mockReturnValue(["read", "bash"]);
     sessionSetActiveToolsByName.mockReturnValue(undefined);
+    authStorageCreate.mockReturnValue({ kind: "auth" });
+    modelRegistryCtor.mockImplementation(function ModelRegistryMock() {
+      return { kind: "models", registerProvider };
+    });
+    settingsManagerCreate.mockReturnValue({ kind: "settings" });
+    registerProvider.mockReturnValue(undefined);
     skillWatcherAddPath.mockResolvedValue(undefined);
     skillWatcherDispose.mockResolvedValue(undefined);
     loadSkills.mockReturnValue({
@@ -169,6 +189,45 @@ describe("PiRuntime", () => {
           sourceInfo: { source: "test" },
         },
       ],
+    });
+  });
+
+  it("uses shellRaining-owned Pi-compatible settings, auth, and models files", async () => {
+    const { createAgentSession } = await import("@mariozechner/pi-coding-agent");
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+
+    expect(authStorageCreate).toHaveBeenCalledWith("/mock/base/agent/auth.json");
+    expect(modelRegistryCtor).toHaveBeenCalledWith(
+      { kind: "auth" },
+      "/mock/base/agent/models.json",
+    );
+    expect(settingsManagerCreate).toHaveBeenCalledWith("/mock/workspace", "/mock/agent");
+    expect(defaultResourceLoader).toHaveBeenCalledWith(
+      expect.objectContaining({ settingsManager: { kind: "settings" } }),
+    );
+    expect(createAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authStorage: { kind: "auth" },
+        modelRegistry: { kind: "models", registerProvider },
+        settingsManager: { kind: "settings" },
+      }),
+    );
+  });
+
+  it("keeps providerBaseUrl as a compatibility provider override", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime({
+      ...createRuntimeConfig(),
+      providerBaseUrl: "https://provider.example.com/v1",
+    });
+
+    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+
+    expect(registerProvider).toHaveBeenCalledWith("shellraining", {
+      baseUrl: "https://provider.example.com/v1",
     });
   });
 
