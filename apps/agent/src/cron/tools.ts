@@ -4,9 +4,9 @@ import type {
   ExtensionAPI,
   ExtensionFactory,
 } from "@mariozechner/pi-coding-agent";
-import type { CronService } from "./service.js";
+import type { CronService } from "@shellraining/cron";
 import { normalizeCronJobInput, type CronJobInput } from "./normalize.js";
-import type { CronJob } from "./types.js";
+import type { AgentCronJob } from "./types.js";
 
 function textResult(text: string): AgentToolResult<{ text: string }> {
   return {
@@ -15,7 +15,7 @@ function textResult(text: string): AgentToolResult<{ text: string }> {
   };
 }
 
-function formatSchedule(job: CronJob): string {
+function formatSchedule(job: AgentCronJob): string {
   if (job.schedule.kind === "at") {
     return `at ${job.schedule.at}`;
   }
@@ -27,11 +27,11 @@ function formatSchedule(job: CronJob): string {
   return job.schedule.tz ? `${job.schedule.expr} (${job.schedule.tz})` : job.schedule.expr;
 }
 
-function formatJob(job: CronJob): string {
+function formatJob(job: AgentCronJob): string {
   return [
     `${job.name}（${job.id}）`,
     `schedule: ${formatSchedule(job)}`,
-    `thread: ${job.threadId}`,
+    `thread: ${job.owner.threadId}`,
     `enabled: ${job.enabled ? "yes" : "no"}`,
   ].join("\n");
 }
@@ -43,7 +43,7 @@ export interface ThreadContext {
 }
 
 export function buildCronExtensionFactory(
-  service: CronService,
+  service: CronService<AgentCronJob["payload"], AgentCronJob["owner"]>,
   thread: ThreadContext,
 ): ExtensionFactory {
   return async (pi: ExtensionAPI) => {
@@ -99,7 +99,7 @@ export function buildCronExtensionFactory(
       description: "List scheduled cron jobs for the current chat.",
       parameters: Type.Object({}),
       async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
-        const jobs = (await service.listJobs()).filter((job) => job.chatId === thread.chatId);
+        const jobs = (await service.listJobs()).filter((job) => job.owner.chatId === thread.chatId);
         if (jobs.length === 0) {
           return textResult("当前聊天没有定时任务。");
         }

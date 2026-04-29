@@ -27,11 +27,13 @@ describe("cron normalize", () => {
     expect(job).toEqual({
       id: "job_123",
       name: "新闻总结",
-      chatId: 1,
-      threadId: "telegram:1",
-      threadKey: "telegram__1",
+      owner: {
+        chatId: 1,
+        threadId: "telegram:1",
+        threadKey: "telegram__1",
+      },
       enabled: true,
-      deleteAfterRun: true,
+      removeAfterSuccess: true,
       createdAtMs: Date.parse("2026-04-16T09:00:00.000Z"),
       schedule: { kind: "at", at: "2026-04-17T07:00:00+08:00" },
       payload: { kind: "agentTurn", message: "总结新闻" },

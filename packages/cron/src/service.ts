@@ -1,71 +1,38 @@
-import { appendCurrentTimeLine } from "../runtime/time-awareness.js";
 import { applyErrorBackoff, computeNextRunAtMs } from "./schedule.js";
 import { findEarliestNextRunAtMs, planTimerDelayMs } from "./timer.js";
-import type { CronJob, CronStoreData } from "./types.js";
+import type {
+  CronCondition,
+  CronConditionResult,
+  CronExecutionResult,
+  CronJob,
+  CronStoreData,
+} from "./types.js";
 
-const DEFAULT_CONDITION_TIMEOUT_MS = 30_000;
-
-function resolveCronPromptTimezone(job: CronJob): string {
-  if (job.schedule.kind !== "cron") {
-    return "UTC";
-  }
-
-  const timezone = job.schedule.tz?.trim();
-  return timezone || "UTC";
+export interface CronServiceStore<TPayload = unknown, TOwner = unknown> {
+  load(): Promise<CronStoreData<TPayload, TOwner>>;
+  save(data: CronStoreData<TPayload, TOwner>): Promise<void>;
 }
 
-function appendCronCurrentTimeLine(message: string, job: CronJob, nowMs: number): string {
-  if (job.schedule.kind !== "cron") {
-    return message.trimEnd();
-  }
-
-  return appendCurrentTimeLine(message, {
-    nowMs,
-    timeZone: resolveCronPromptTimezone(job),
-  });
-}
-
-export interface CronServiceStore {
-  load(): Promise<CronStoreData>;
-  save(data: CronStoreData): Promise<void>;
-}
-
-export interface CronServiceRuntime {
-  prompt(threadKey: string, text: string, cwd: string): Promise<{ text: string; error?: string }>;
-}
-
-/**
- * Dependencies for `CronService`, injected so that time sources and timers
- * can be controlled in tests (e.g. fake `now()`, immediate `setTimeoutFn`).
- */
-export interface CronServiceDeps {
-  store: CronServiceStore;
-  runtime: CronServiceRuntime;
-  deliver: (threadId: string, text: string) => Promise<void>;
-  workspaceForThreadKey: (threadKey: string) => Promise<string> | string;
-  execCommand: (
-    command: string,
-    cwd: string,
-    timeoutMs: number,
-  ) => Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>;
+export interface CronServiceDeps<TPayload = unknown, TOwner = unknown> {
+  store: CronServiceStore<TPayload, TOwner>;
+  execute: (job: CronJob<TPayload, TOwner>, nowMs: number) => Promise<CronExecutionResult>;
+  runCondition: (
+    condition: CronCondition,
+    job: CronJob<TPayload, TOwner>,
+  ) => Promise<CronConditionResult>;
   now: () => number;
   setTimeoutFn: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   clearTimeoutFn: (handle: ReturnType<typeof setTimeout>) => void;
   runTimeoutMs: number;
-  /**
-   * One-shot (`"at"`) jobs whose scheduled time is farther in the past than
-   * this threshold are marked as "missed" at startup rather than executed.
-   */
   misfireGraceMs: number;
 }
 
-export class CronService {
+export class CronService<TPayload = unknown, TOwner = unknown> {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private started = false;
-  /** Coalesces concurrent `runDueJobs` calls into a single execution. */
   private runningDueJobs: Promise<void> | undefined;
 
-  constructor(private readonly deps: CronServiceDeps) {}
+  constructor(private readonly deps: CronServiceDeps<TPayload, TOwner>) {}
 
   async start(): Promise<void> {
     if (this.started) {
@@ -82,20 +49,19 @@ export class CronService {
     this.clearTimer();
   }
 
-  async listJobs(): Promise<CronJob[]> {
+  async listJobs(): Promise<CronJob<TPayload, TOwner>[]> {
     const data = await this.deps.store.load();
     return data.jobs;
   }
 
-  async add(job: CronJob): Promise<CronJob> {
+  async add(job: CronJob<TPayload, TOwner>): Promise<CronJob<TPayload, TOwner>> {
     const data = await this.deps.store.load();
     const nowMs = this.deps.now();
-    const nextRunAtMs = computeNextRunAtMs(job.schedule, nowMs);
-    const nextJob: CronJob = {
+    const nextJob: CronJob<TPayload, TOwner> = {
       ...job,
       state: {
         ...job.state,
-        nextRunAtMs,
+        nextRunAtMs: computeNextRunAtMs(job.schedule, nowMs),
       },
     };
 
@@ -122,7 +88,7 @@ export class CronService {
     return true;
   }
 
-  async run(jobId: string): Promise<CronJob | undefined> {
+  async run(jobId: string): Promise<CronJob<TPayload, TOwner> | undefined> {
     return this.runJob(jobId, true);
   }
 
@@ -156,7 +122,10 @@ export class CronService {
     await this.scheduleNextTimer();
   }
 
-  private async runJob(jobId: string, rescheduleAfterRun: boolean): Promise<CronJob | undefined> {
+  private async runJob(
+    jobId: string,
+    rescheduleAfterRun: boolean,
+  ): Promise<CronJob<TPayload, TOwner> | undefined> {
     const data = await this.deps.store.load();
     const job = data.jobs.find((candidate) => candidate.id === jobId);
     if (!job) {
@@ -166,17 +135,10 @@ export class CronService {
     const nowMs = this.deps.now();
 
     try {
-      const workspace = await this.deps.workspaceForThreadKey(job.threadKey);
-
       if (job.condition) {
-        const condResult = await this.deps.execCommand(
-          job.condition.command,
-          workspace,
-          job.condition.timeoutMs ?? DEFAULT_CONDITION_TIMEOUT_MS,
-        );
-
-        if (condResult.exitCode === 1) {
-          const updated: CronJob = {
+        const condResult = await this.deps.runCondition(job.condition, job);
+        if (condResult.status === "skip") {
+          const updated: CronJob<TPayload, TOwner> = {
             ...job,
             state: {
               ...job.state,
@@ -190,11 +152,8 @@ export class CronService {
           return updated;
         }
 
-        if (condResult.exitCode !== 0) {
-          const message = condResult.signal
-            ? `Condition command terminated by signal ${condResult.signal}`
-            : `Condition command exited with code ${condResult.exitCode}`;
-          const updated = this.buildFailureJob(job, nowMs, message);
+        if (condResult.status === "error") {
+          const updated = this.buildFailureJob(job, nowMs, condResult.error);
           await this.saveUpdatedJob(data, updated);
           if (rescheduleAfterRun) {
             await this.scheduleNextTimer();
@@ -203,12 +162,8 @@ export class CronService {
         }
       }
 
-      const promptText = appendCronCurrentTimeLine(job.payload.message, job, nowMs);
-      const result = await this.runWithTimeout(() =>
-        this.deps.runtime.prompt(job.threadKey, promptText, workspace),
-      );
-
-      if (result.error) {
+      const result = await this.runWithTimeout(() => this.deps.execute(job, nowMs));
+      if (result.status === "error") {
         const updated = this.buildFailureJob(job, nowMs, result.error);
         await this.saveUpdatedJob(data, updated);
         if (rescheduleAfterRun) {
@@ -217,7 +172,7 @@ export class CronService {
         return updated;
       }
 
-      const updated: CronJob = {
+      const updated: CronJob<TPayload, TOwner> = {
         ...job,
         state: {
           ...job.state,
@@ -228,9 +183,7 @@ export class CronService {
         },
       };
 
-      await this.deps.deliver(job.threadId, result.text || "(no output)");
-
-      if (job.deleteAfterRun) {
+      if (job.removeAfterSuccess) {
         await this.deps.store.save({
           ...data,
           jobs: data.jobs.filter((candidate) => candidate.id !== job.id),
@@ -241,8 +194,6 @@ export class CronService {
         return undefined;
       }
 
-      // `nowMs + 1` avoids immediately re-scheduling an "every" job whose
-      // interval aligns with the current millisecond.
       updated.state.nextRunAtMs = computeNextRunAtMs(job.schedule, nowMs + 1);
       await this.saveUpdatedJob(data, updated);
       if (rescheduleAfterRun) {
@@ -260,11 +211,6 @@ export class CronService {
     }
   }
 
-  /**
-   * At startup, mark one-shot (`"at"`) jobs that were missed while the service
-   * was offline and recompute `nextRunAtMs` for all enabled jobs based on the
-   * current time.
-   */
   private async hydrateStartupJobs(): Promise<void> {
     const data = await this.deps.store.load();
     const nowMs = this.deps.now();
@@ -288,7 +234,7 @@ export class CronService {
               lastError: "Missed scheduled run while service was offline",
               nextRunAtMs: undefined,
             },
-          } satisfies CronJob;
+          };
         }
       }
 
@@ -304,7 +250,7 @@ export class CronService {
           ...job.state,
           nextRunAtMs,
         },
-      } satisfies CronJob;
+      };
     });
 
     if (!changed) {
@@ -317,13 +263,13 @@ export class CronService {
     });
   }
 
-  /**
-   * Auto-disable one-shot (`"at"`) jobs after 3 consecutive errors.
-   * For recurring jobs, apply exponential backoff to `nextRunAtMs` instead.
-   */
-  private buildFailureJob(job: CronJob, nowMs: number, errorMessage: string): CronJob {
+  private buildFailureJob(
+    job: CronJob<TPayload, TOwner>,
+    nowMs: number,
+    errorMessage: string,
+  ): CronJob<TPayload, TOwner> {
     const consecutiveErrors = job.state.consecutiveErrors + 1;
-    const updated: CronJob = {
+    const updated: CronJob<TPayload, TOwner> = {
       ...job,
       state: {
         ...job.state,
@@ -340,14 +286,15 @@ export class CronService {
       return updated;
     }
 
-    // For one-shot jobs that haven't hit the error threshold yet, retry
-    // immediately (from `nowMs`) so the next attempt happens soon.
     const normalNext = job.schedule.kind === "at" ? nowMs : computeNextRunAtMs(job.schedule, nowMs);
     updated.state.nextRunAtMs = applyErrorBackoff(normalNext, consecutiveErrors, nowMs);
     return updated;
   }
 
-  private async saveUpdatedJob(data: CronStoreData, job: CronJob): Promise<void> {
+  private async saveUpdatedJob(
+    data: CronStoreData<TPayload, TOwner>,
+    job: CronJob<TPayload, TOwner>,
+  ): Promise<void> {
     await this.deps.store.save({
       ...data,
       jobs: data.jobs.map((candidate) => (candidate.id === job.id ? job : candidate)),

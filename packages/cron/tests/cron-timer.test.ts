@@ -1,23 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { CronJob } from "../src/cron/types.js";
-import {
-  findEarliestNextRunAtMs,
-  MAX_TIMER_DELAY_MS,
-  planTimerDelayMs,
-} from "../src/cron/timer.js";
+import type { CronJob } from "../src/index.js";
+import { findEarliestNextRunAtMs, MAX_TIMER_DELAY_MS, planTimerDelayMs } from "../src/index.js";
 
 function createJob(id: string, nextRunAtMs?: number, enabled = true): CronJob {
   return {
     id,
     name: `job-${id}`,
-    chatId: 1,
-    threadId: "telegram:1",
-    threadKey: "telegram__1",
+    owner: { tenantId: "tenant-1" },
     enabled,
-    deleteAfterRun: false,
+    removeAfterSuccess: false,
     createdAtMs: 1,
     schedule: { kind: "every", everyMs: 60_000 },
-    payload: { kind: "agentTurn", message: "run" },
+    payload: { kind: "test", message: "run" },
     state: { consecutiveErrors: 0, nextRunAtMs },
   };
 }

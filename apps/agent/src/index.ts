@@ -3,13 +3,13 @@ import { Hono } from "hono";
 import { config as loadEnv } from "dotenv";
 import { createBot } from "./bot.js";
 import { loadConfig } from "./config.js";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { CronService } from "./cron/service.js";
-import { CronStore } from "./cron/store.js";
+import { ExecaError, execa } from "execa";
+import { CronService, CronStore, type CronCondition, type CronConditionResult } from "@shellraining/cron";
 import { buildCronExtensionFactory } from "./cron/tools.js";
+import type { AgentCronJob, AgentCronOwner, AgentCronPayload } from "./cron/types.js";
 import { PiRuntime } from "./pi/runtime.js";
 import { getThreadIdFromKey, getChatIdFromThreadKey } from "./pi/session-store.js";
+import { appendCurrentTimeLine } from "./runtime/time-awareness.js";
 import { syncPiSettings } from "./runtime/pi-settings.js";
 import { getWorkspace } from "./runtime/workspace.js";
 
@@ -37,51 +37,95 @@ await syncPiSettings({
   skillsDir: config.skillsDir,
 });
 
-const cronStore = new CronStore(config.cron.jobsPath);
-const execFileAsync = promisify(execFile);
+const cronStore = new CronStore<AgentCronPayload, AgentCronOwner>(config.cron.jobsPath);
 
 async function execCommand(command: string, cwd: string, timeoutMs: number) {
   try {
-    await execFileAsync("bash", ["-c", command], {
-      cwd,
-      timeout: timeoutMs,
-      windowsHide: true,
-      maxBuffer: 1024 * 1024,
-    });
+    await execa({ cwd, timeout: timeoutMs })`bash -c ${command}`;
     return { exitCode: 0 as const };
   } catch (error) {
-    const details = error as NodeJS.ErrnoException & {
-      code?: string | number;
-      signal?: NodeJS.Signals;
-      killed?: boolean;
-    };
-
-    if (typeof details.code === "number") {
-      return { exitCode: details.code, signal: details.signal };
+    if (error instanceof ExecaError) {
+      if (error.isTerminated) {
+        return { exitCode: null, signal: error.signal };
+      }
+      if (error.exitCode !== undefined) {
+        return { exitCode: error.exitCode, signal: error.signal };
+      }
     }
-
-    if (details.signal) {
-      return { exitCode: null, signal: details.signal };
-    }
-
     throw error;
   }
 }
 
+function resolveCronPromptTimezone(job: AgentCronJob): string {
+  if (job.schedule.kind !== "cron") {
+    return "UTC";
+  }
+
+  const timezone = job.schedule.tz?.trim();
+  return timezone || "UTC";
+}
+
+function buildCronPromptText(job: AgentCronJob, nowMs: number): string {
+  if (job.schedule.kind !== "cron") {
+    return job.payload.message.trimEnd();
+  }
+
+  return appendCurrentTimeLine(job.payload.message, {
+    nowMs,
+    timeZone: resolveCronPromptTimezone(job),
+  });
+}
+
+async function runCronCondition(
+  condition: CronCondition,
+  job: AgentCronJob,
+): Promise<CronConditionResult> {
+  const workspace = await getWorkspace(job.owner.threadKey, config.workspace);
+  const result = await execCommand(condition.command, workspace, condition.timeoutMs ?? 30_000);
+
+  if (result.exitCode === 0) {
+    return { status: "pass" };
+  }
+
+  if (result.exitCode === 1) {
+    return { status: "skip" };
+  }
+
+  return {
+    status: "error",
+    error: result.signal
+      ? `Condition command terminated by signal ${result.signal}`
+      : `Condition command exited with code ${result.exitCode}`,
+  };
+}
+
 let runtime: PiRuntime;
-const cronService = new CronService({
+const cronService = new CronService<AgentCronPayload, AgentCronOwner>({
   store: cronStore,
-  runtime: {
-    prompt: (threadKey, text, cwd) => runtime.prompt(threadKey, text, cwd),
+  async execute(job, nowMs) {
+    const workspace = await getWorkspace(job.owner.threadKey, config.workspace);
+    const promptText = buildCronPromptText(job, nowMs);
+    const result = await runtime.prompt(job.owner.threadKey, promptText, workspace);
+
+    if (result.error) {
+      return { status: "error", error: result.error };
+    }
+
+    await botRuntime.telegram.postCronMessage(job.owner.threadId, result.text || "(no output)");
+    return { status: "success" };
   },
-  deliver: (threadId, text) => botRuntime.telegram.postCronMessage(threadId, text),
-  workspaceForThreadKey: (threadKey) => getWorkspace(threadKey, config.workspace),
+  async runCondition(condition, job) {
+    try {
+      return await runCronCondition(condition, job);
+    } catch (error) {
+      return { status: "error", error: error instanceof Error ? error.message : String(error) };
+    }
+  },
   now: () => Date.now(),
   setTimeoutFn: (callback, delayMs) => setTimeout(callback, delayMs),
   clearTimeoutFn: (handle) => clearTimeout(handle),
   runTimeoutMs: config.cron.runTimeoutMs,
   misfireGraceMs: config.cron.misfireGraceMs,
-  execCommand,
 });
 runtime = new PiRuntime(config, {
   extensionFactories: (threadKey) => {

@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @shellraining/agent dev",
-    "build": "pnpm --filter @shellraining/system-prompt build && pnpm --filter @shellraining/agent build",
+    "build": "pnpm --filter @shellraining/system-prompt build && pnpm --filter @shellraining/cron build && pnpm --filter @shellraining/agent build",
     "start": "pnpm --filter @shellraining/agent start",
-    "typecheck": "pnpm --filter @shellraining/system-prompt typecheck && pnpm --filter @shellraining/system-prompt build && pnpm --filter @shellraining/agent typecheck",
+    "typecheck": "pnpm --filter @shellraining/system-prompt typecheck && pnpm --filter @shellraining/system-prompt build && pnpm --filter @shellraining/cron typecheck && pnpm --filter @shellraining/cron build && pnpm --filter @shellraining/agent typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint",

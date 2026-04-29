@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { CronJob } from "../src/cron/types.js";
+import type { AgentCronJob } from "../src/cron/types.js";
 
-function createJob(overrides: Partial<CronJob> = {}): CronJob {
-  const base: CronJob = {
+function createJob(overrides: Partial<AgentCronJob> = {}): AgentCronJob {
+  const base: AgentCronJob = {
     id: "job_123",
     name: "新闻总结",
-    chatId: 1,
-    threadId: "telegram:1",
-    threadKey: "telegram__1",
+    owner: {
+      chatId: 1,
+      threadId: "telegram:1",
+      threadKey: "telegram__1",
+    },
     enabled: true,
-    deleteAfterRun: false,
+    removeAfterSuccess: false,
     createdAtMs: Date.parse("2026-04-16T09:00:00.000Z"),
     schedule: { kind: "every", everyMs: 60_000 },
     payload: { kind: "agentTurn", message: "总结新闻" },
@@ -20,6 +22,10 @@ function createJob(overrides: Partial<CronJob> = {}): CronJob {
   return {
     ...base,
     ...overrides,
+    owner: {
+      ...base.owner,
+      ...overrides.owner,
+    },
     payload: {
       ...base.payload,
       ...overrides.payload,
@@ -47,7 +53,7 @@ describe("buildCronExtensionFactory", () => {
   it("creates jobs through cron_create without explicit thread params", async () => {
     const { buildCronExtensionFactory } = await import("../src/cron/tools.js");
     const service = {
-      add: vi.fn(async (job: CronJob) => job),
+      add: vi.fn(async (job: AgentCronJob) => job),
       listJobs: vi.fn(async () => []),
       remove: vi.fn(async () => false),
     };
@@ -65,9 +71,11 @@ describe("buildCronExtensionFactory", () => {
     expect(service.add).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "新闻总结",
-        chatId: 1,
-        threadId: "telegram:1",
-        threadKey: "telegram__1",
+        owner: {
+          chatId: 1,
+          threadId: "telegram:1",
+          threadKey: "telegram__1",
+        },
         payload: { kind: "agentTurn", message: "总结新闻" },
       }),
     );
@@ -80,8 +88,16 @@ describe("buildCronExtensionFactory", () => {
     const service = {
       add: vi.fn(),
       listJobs: vi.fn(async () => [
-        createJob({ id: "job_chat_1", chatId: 1, name: "新闻总结" }),
-        createJob({ id: "job_chat_2", chatId: 2, name: "别的聊天" }),
+        createJob({
+          id: "job_chat_1",
+          owner: { chatId: 1, threadId: "telegram:1", threadKey: "telegram__1" },
+          name: "新闻总结",
+        }),
+        createJob({
+          id: "job_chat_2",
+          owner: { chatId: 2, threadId: "telegram:2", threadKey: "telegram__2" },
+          name: "别的聊天",
+        }),
       ]),
       remove: vi.fn(),
     };
@@ -100,7 +116,7 @@ describe("buildCronExtensionFactory", () => {
   it("forwards condition fields through cron_create", async () => {
     const { buildCronExtensionFactory } = await import("../src/cron/tools.js");
     const service = {
-      add: vi.fn(async (job: CronJob) => job),
+      add: vi.fn(async (job: AgentCronJob) => job),
       listJobs: vi.fn(async () => []),
       remove: vi.fn(async () => false),
     };

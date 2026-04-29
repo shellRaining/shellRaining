@@ -2,20 +2,20 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { CronStoreData } from "./types.js";
 
-function createEmptyStore(): CronStoreData {
+function createEmptyStore<TPayload, TOwner>(): CronStoreData<TPayload, TOwner> {
   return {
     version: 1,
     jobs: [],
   };
 }
 
-export class CronStore {
+export class CronStore<TPayload = unknown, TOwner = unknown> {
   constructor(private readonly jobsPath: string) {}
 
-  async load(): Promise<CronStoreData> {
+  async load(): Promise<CronStoreData<TPayload, TOwner>> {
     try {
       const raw = await readFile(this.jobsPath, "utf8");
-      const parsed = JSON.parse(raw) as CronStoreData;
+      const parsed = JSON.parse(raw) as CronStoreData<TPayload, TOwner>;
 
       return {
         version: 1,
@@ -23,13 +23,13 @@ export class CronStore {
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return createEmptyStore();
+        return createEmptyStore<TPayload, TOwner>();
       }
       throw error;
     }
   }
 
-  async save(data: CronStoreData): Promise<void> {
+  async save(data: CronStoreData<TPayload, TOwner>): Promise<void> {
     await mkdir(dirname(this.jobsPath), { recursive: true });
 
     const next = JSON.stringify(
@@ -42,8 +42,6 @@ export class CronStore {
     );
     const tempPath = `${this.jobsPath}.tmp`;
 
-    // Atomic write: write to a temp file first, then rename. rename() is
-    // atomic on most filesystems, so a crash mid-write won't corrupt the store.
     await writeFile(tempPath, `${next}\n`, "utf8");
     await rename(tempPath, this.jobsPath);
   }

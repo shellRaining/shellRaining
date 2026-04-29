@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { CronStoreData } from "../src/cron/types.js";
+import type { CronStoreData } from "../src/index.js";
 
 let tempRoot: string;
 
@@ -16,7 +16,7 @@ describe("CronStore", () => {
   });
 
   it("returns an empty store when the file does not exist", async () => {
-    const { CronStore } = await import("../src/cron/store.js");
+    const { CronStore } = await import("../src/index.js");
 
     const store = new CronStore(join(tempRoot, "cron", "jobs.json"));
 
@@ -27,7 +27,7 @@ describe("CronStore", () => {
   });
 
   it("persists jobs across save and load", async () => {
-    const { CronStore } = await import("../src/cron/store.js");
+    const { CronStore } = await import("../src/index.js");
 
     const storePath = join(tempRoot, "cron", "jobs.json");
     const store = new CronStore(storePath);
@@ -37,14 +37,12 @@ describe("CronStore", () => {
         {
           id: "job_123",
           name: "Daily summary",
-          chatId: 42,
-          threadId: "telegram:42",
-          threadKey: "telegram__42",
+          owner: { tenantId: "tenant-1" },
           enabled: true,
-          deleteAfterRun: false,
+          removeAfterSuccess: false,
           createdAtMs: 1713200000000,
           schedule: { kind: "cron", expr: "0 9 * * *" },
-          payload: { kind: "agentTurn", message: "Send the daily summary" },
+          payload: { kind: "test", message: "Send the daily summary" },
           state: { consecutiveErrors: 0 },
         },
       ],

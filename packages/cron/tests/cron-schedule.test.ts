@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyErrorBackoff, computeNextRunAtMs } from "../src/cron/schedule.js";
+import { applyErrorBackoff, computeNextRunAtMs } from "../src/index.js";
 
 describe("cron schedule", () => {
   it("aligns interval schedules to their anchor", () => {

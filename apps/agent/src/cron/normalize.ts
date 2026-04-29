@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
-import type { CronCondition, CronJob, CronSchedule } from "./types.js";
+import type { CronCondition, CronSchedule } from "@shellraining/cron";
+import type { AgentCronJob } from "./types.js";
 
 export interface CronJobInput {
   name: string;
@@ -14,7 +15,7 @@ export interface CronJobInput {
   };
 }
 
-export function normalizeCronJobInput(input: CronJobInput): CronJob {
+export function normalizeCronJobInput(input: CronJobInput): AgentCronJob {
   const name = input.name.trim();
   const message = input.payload.message.trim();
 
@@ -51,14 +52,13 @@ export function normalizeCronJobInput(input: CronJobInput): CronJob {
   return {
     id: nanoid(),
     name,
-    chatId: input.chatId,
-    threadId: input.threadId,
-    threadKey: input.threadKey,
+    owner: {
+      chatId: input.chatId,
+      threadId: input.threadId,
+      threadKey: input.threadKey,
+    },
     enabled: true,
-    // `deleteAfterRun` is a misnomer: the job is not deleted on success but
-    // rather auto-disabled after 3 consecutive errors. For one-shot ("at") jobs
-    // it is set to `true` so that successful runs remove the job entirely.
-    deleteAfterRun: input.schedule.kind === "at",
+    removeAfterSuccess: input.schedule.kind === "at",
     createdAtMs: Date.now(),
     schedule: input.schedule,
     condition,

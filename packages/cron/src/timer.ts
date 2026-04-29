@@ -1,6 +1,5 @@
 import type { CronJob } from "./types.js";
 
-/** Node.js `setTimeout` uses a signed 32-bit integer for delay, capping at ~24.8 days. We cap at 60s and let `scheduleNextTimer` re-fire to re-evaluate. */
 export const MAX_TIMER_DELAY_MS = 60_000;
 
 export function planTimerDelayMs(nextRunAtMs: number, nowMs: number): number {
