@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @shellraining/agent dev",
-    "build": "pnpm --filter @shellraining/system-prompt build && pnpm --filter @shellraining/cron build && pnpm --filter @shellraining/agent build",
+    "build": "pnpm -r --if-present build",
     "start": "pnpm --filter @shellraining/agent start",
-    "typecheck": "pnpm --filter @shellraining/system-prompt typecheck && pnpm --filter @shellraining/system-prompt build && pnpm --filter @shellraining/cron typecheck && pnpm --filter @shellraining/cron build && pnpm --filter @shellraining/agent typecheck",
-    "test": "vitest run",
+    "typecheck": "pnpm -r --if-present build && pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
     "test:watch": "vitest",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
