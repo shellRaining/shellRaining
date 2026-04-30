@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import {
   createAgentSession,
   AuthStorage,
@@ -9,11 +10,9 @@ import {
   type AgentSessionEvent,
   type ExtensionFactory,
   type SessionInfo,
-  loadSkills,
 } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
-import { SkillWatcher } from "./skill-watcher.js";
 import { getSessionDirectoryForThread } from "./session-store.js";
 
 export interface PiPromptResult {
@@ -72,7 +71,6 @@ export class PiRuntime {
    * await the running promise when injecting a mid-session message.
    */
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
-  private skillWatcher: SkillWatcher | undefined;
 
   constructor(
     private readonly config: Config,
@@ -86,27 +84,16 @@ export class PiRuntime {
   ): Promise<CachedSession> {
     const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
     await mkdir(sessionDir, { recursive: true });
-    const shellRainingSkills = loadSkills({
-      includeDefaults: false,
-      skillPaths: [this.config.skillsDir],
-    });
-    const authStorage = AuthStorage.create(this.config.pi.authPath);
-    const modelRegistry = new ModelRegistry(authStorage, this.config.pi.modelsPath);
-    const settingsManager = SettingsManager.create(cwd, this.config.agentDir);
-
-    if (this.config.providerBaseUrl) {
-      modelRegistry.registerProvider("shellraining", {
-        baseUrl: this.config.providerBaseUrl,
-      });
-    }
+    const profileRoot = this.getDefaultProfileRoot();
+    const authStorage = AuthStorage.create(join(profileRoot, "auth.json"));
+    const modelRegistry = new ModelRegistry(authStorage, join(profileRoot, "models.json"));
+    const settingsManager = SettingsManager.create(cwd, profileRoot);
 
     const resourceLoader = new DefaultResourceLoader({
       cwd,
-      agentDir: this.config.agentDir,
+      agentDir: profileRoot,
       settingsManager,
       extensionFactories: this.options.extensionFactories?.(threadKey),
-      noSkills: true,
-      skillsOverride: () => shellRainingSkills,
       appendSystemPromptOverride: (base) => [
         ...base,
         buildShellRainingSystemPrompt({
@@ -122,7 +109,7 @@ export class PiRuntime {
 
     const { session } = await createAgentSession({
       cwd,
-      agentDir: this.config.agentDir,
+      agentDir: profileRoot,
       authStorage,
       modelRegistry,
       settingsManager,
@@ -136,26 +123,15 @@ export class PiRuntime {
     const cached = { cwd, session };
     this.sessions.set(threadKey, cached);
 
-    await this.ensureSkillWatcher(resourceLoader, session);
-
     return cached;
   }
 
-  private async ensureSkillWatcher(
-    resourceLoader: DefaultResourceLoader,
-    session: Awaited<ReturnType<typeof createAgentSession>>["session"],
-  ): Promise<void> {
-    if (!this.skillWatcher) {
-      this.skillWatcher = new SkillWatcher({
-        paths: [this.config.skillsDir],
-        debounceMs: 500,
-        onReload: async () => {
-          await resourceLoader.reload();
-          session.setActiveToolsByName(session.getActiveToolNames());
-        },
-      });
-      return;
+  private getDefaultProfileRoot(): string {
+    const agent = this.config.agents[this.config.defaultAgent];
+    if (!agent) {
+      throw new Error(`Default agent is not configured: ${this.config.defaultAgent}`);
     }
+    return agent.profileRoot;
   }
 
   private async getOrCreateSession(threadKey: string, cwd: string): Promise<CachedSession> {
@@ -313,7 +289,5 @@ export class PiRuntime {
       session.dispose();
     }
     this.sessions.clear();
-    await this.skillWatcher?.dispose();
-    this.skillWatcher = undefined;
   }
 }

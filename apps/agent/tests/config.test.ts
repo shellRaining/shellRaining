@@ -35,12 +35,87 @@ describe("config", () => {
     const config = loadConfig();
     expect(config.workspace).toBe("/mock/home/shellRaining-workspace");
     expect(config.baseDir).toBe("/mock/home/.shellRaining");
-    expect(config.agentDir).toBe("/mock/home/.shellRaining/agent");
-    expect(config.pi).toEqual({
-      settingsPath: "/mock/home/.shellRaining/agent/settings.json",
-      authPath: "/mock/home/.shellRaining/agent/auth.json",
-      modelsPath: "/mock/home/.shellRaining/agent/models.json",
+    expect(config.defaultAgent).toBe("default");
+    expect(config.agents).toEqual({
+      default: {
+        displayName: "shellRaining",
+        id: "default",
+        piProfile: "default",
+        profileRoot: "/mock/home/.shellRaining/pi-profiles/default",
+      },
     });
+    expect("agentDir" in config).toBe(false);
+    expect("skillsDir" in config).toBe(false);
+    expect("providerBaseUrl" in config).toBe(false);
+    expect("pi" in config).toBe(false);
+  });
+
+  it("derives Pi profile roots from shellRaining-owned agent mappings", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: {
+          botToken: "file-token",
+          defaultAgent: "coder",
+        },
+        paths: {
+          baseDir: join(tempDir, "base"),
+        },
+        agents: {
+          reviewer: {
+            displayName: "Reviewer",
+            piProfile: "reviewer-profile",
+          },
+          coder: {
+            displayName: "Coder",
+            piProfile: "coder-profile",
+          },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = loadConfig();
+
+    expect(config.defaultAgent).toBe("coder");
+    expect(config.agents).toEqual({
+      coder: {
+        displayName: "Coder",
+        id: "coder",
+        piProfile: "coder-profile",
+        profileRoot: join(tempDir, "base", "pi-profiles", "coder-profile"),
+      },
+      reviewer: {
+        displayName: "Reviewer",
+        id: "reviewer",
+        piProfile: "reviewer-profile",
+        profileRoot: join(tempDir, "base", "pi-profiles", "reviewer-profile"),
+      },
+    });
+  });
+
+  it("rejects unsafe Pi profile ids", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        agents: {
+          coder: { piProfile: "../pi" },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    expect(() => loadConfig()).toThrow("Invalid Pi profile id");
   });
 
   it("loads shellRaining config file values", async () => {
@@ -55,14 +130,12 @@ describe("config", () => {
           apiBaseUrl: "https://telegram.example.com/",
           webhookSecret: "file-secret",
           allowedUsers: [123, 456],
+          showThinking: true,
         },
         paths: {
           baseDir: join(tempDir, "base"),
           workspace: join(tempDir, "workspace"),
-          agentDir: join(tempDir, "base", "agent"),
-          skillsDir: join(tempDir, "skills"),
         },
-        agent: { showThinking: true },
         cron: {
           jobsPath: "~/.shellRaining/cron/jobs.json",
           runTimeoutMs: 1000,
@@ -88,8 +161,6 @@ describe("config", () => {
     expect(config.port).toBe(4567);
     expect(config.baseDir).toBe(join(tempDir, "base"));
     expect(config.workspace).toBe(join(tempDir, "workspace"));
-    expect(config.agentDir).toBe(join(tempDir, "base", "agent"));
-    expect(config.skillsDir).toBe(join(tempDir, "skills"));
     expect(config.showThinking).toBe(true);
     expect(config.cron.jobsPath).toBe("/mock/home/.shellRaining/cron/jobs.json");
     expect(config.cron.runTimeoutMs).toBe(1000);
@@ -99,9 +170,6 @@ describe("config", () => {
       baseUrl: "https://stt.example.com",
       model: "whisper-test",
     });
-    expect(config.pi.settingsPath).toBe(join(tempDir, "base", "agent", "settings.json"));
-    expect(config.pi.authPath).toBe(join(tempDir, "base", "agent", "auth.json"));
-    expect(config.pi.modelsPath).toBe(join(tempDir, "base", "agent", "models.json"));
   });
 
   it("lets environment variables override shellRaining config file values", async () => {
@@ -111,9 +179,8 @@ describe("config", () => {
       configPath,
       JSON.stringify({
         server: { port: 4567 },
-        telegram: { botToken: "file-token", allowedUsers: [123] },
         paths: { baseDir: join(tempDir, "file-base") },
-        agent: { showThinking: false },
+        telegram: { botToken: "file-token", allowedUsers: [123], showThinking: false },
       }),
     );
 
@@ -132,7 +199,9 @@ describe("config", () => {
     expect(config.baseDir).toBe(join(tempDir, "env-base"));
     expect(config.allowedUsers).toEqual([789, 101]);
     expect(config.showThinking).toBe(true);
-    expect(config.agentDir).toBe(join(tempDir, "env-base", "agent"));
+    expect(config.agents.default?.profileRoot).toBe(
+      join(tempDir, "env-base", "pi-profiles", "default"),
+    );
   });
 
   it("loads cron storage and timeout defaults", async () => {

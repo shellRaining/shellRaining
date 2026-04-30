@@ -67,7 +67,10 @@ export function isTelegramInputProcessable(input: NormalizedTelegramInput): bool
 }
 
 export function formatTelegramStatusMessage(input: {
-  skillsDir: string;
+  agentDisplayName: string;
+  agentId: string;
+  piProfile: string;
+  profileRoot: string;
   telegramApiBaseUrl?: string;
   threadId: string;
   workspace: string;
@@ -76,7 +79,10 @@ export function formatTelegramStatusMessage(input: {
   return [
     `thread=${input.threadId}`,
     `workspace=${formatPath(input.workspace)}`,
-    `skills=${input.skillsDir}`,
+    `agent=${input.agentId}`,
+    `agentName=${input.agentDisplayName}`,
+    `piProfile=${input.piProfile}`,
+    `profileRoot=${input.profileRoot}`,
     `telegramApi=${telegramApi}`,
   ].join("\n");
 }
@@ -206,9 +212,16 @@ async function handleCommand(
       return true;
     }
     case "status":
+      const agent = config.agents[config.defaultAgent];
+      if (!agent) {
+        throw new Error(`Default agent is not configured: ${config.defaultAgent}`);
+      }
       await thread.post(
         formatTelegramStatusMessage({
-          skillsDir: config.skillsDir,
+          agentDisplayName: agent.displayName,
+          agentId: agent.id,
+          piProfile: agent.piProfile,
+          profileRoot: agent.profileRoot,
           telegramApiBaseUrl: config.telegramApiBaseUrl,
           threadId: thread.id,
           workspace: currentWorkspace,

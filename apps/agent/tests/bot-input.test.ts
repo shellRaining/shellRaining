@@ -78,7 +78,10 @@ describe("bot telegram input routing", () => {
   it("includes the configured Telegram API endpoint in status output", () => {
     expect(
       formatTelegramStatusMessage({
-        skillsDir: "/skills",
+        agentDisplayName: "Coder",
+        agentId: "coder",
+        piProfile: "coder-profile",
+        profileRoot: "/profiles/coder-profile",
         telegramApiBaseUrl: "http://127.0.0.1:8090",
         threadId: "telegram:1",
         workspace: "/workspace",

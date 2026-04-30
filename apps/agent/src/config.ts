@@ -16,10 +16,10 @@ export interface Config {
   baseDir: string;
   /** Directory where Pi agent workspaces are created (per-thread subdirectories). */
   workspace: string;
-  /** Path to the Pi agent configuration directory. */
-  agentDir: string;
-  /** Path to the skills directory synced into Pi's `settings.json`. */
-  skillsDir: string;
+  /** Default Telegram-visible agent id. */
+  defaultAgent: string;
+  /** Telegram-visible agents mapped to derived Pi profile roots. */
+  agents: Record<string, ResolvedAgentConfig>;
   /** Telegram user IDs allowed to interact with the bot. Empty = all users blocked. */
   allowedUsers: number[];
   /** Whether to include the agent's thinking output in Telegram replies. @defaultValue false */
@@ -41,14 +41,13 @@ export interface Config {
     /** Model name to request from the STT service. */
     model?: string;
   };
-  /** Override base URL for the LLM provider (e.g. for a proxy or compatible API). */
-  providerBaseUrl?: string;
-  /** Pi-compatible files owned by shellRaining's agent directory. */
-  pi: {
-    settingsPath: string;
-    authPath: string;
-    modelsPath: string;
-  };
+}
+
+export interface ResolvedAgentConfig {
+  id: string;
+  displayName: string;
+  piProfile: string;
+  profileRoot: string;
 }
 
 interface ShellRainingConfigFile {
@@ -60,17 +59,21 @@ interface ShellRainingConfigFile {
     apiBaseUrl?: string;
     webhookSecret?: string;
     allowedUsers?: number[];
+    defaultAgent?: string;
+    showThinking?: boolean;
   };
   paths?: {
     baseDir?: string;
     workspace?: string;
-    agentDir?: string;
-    skillsDir?: string;
   };
-  agent?: {
-    showThinking?: boolean;
-    providerBaseUrl?: string;
-  };
+  agents?: Record<
+    string,
+    {
+      displayName?: string;
+      piProfile?: string;
+      aliases?: string[];
+    }
+  >;
   cron?: {
     jobsPath?: string;
     runTimeoutMs?: number;
@@ -152,6 +155,55 @@ function firstNumber(...values: Array<number | undefined>): number | undefined {
   return undefined;
 }
 
+function assertSafePiProfileId(profileId: string): void {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(profileId)) {
+    throw new Error(`Invalid Pi profile id: ${profileId}`);
+  }
+}
+
+function resolveAgents(
+  agents: ShellRainingConfigFile["agents"],
+  baseDir: string,
+): Record<string, ResolvedAgentConfig> {
+  const entries = agents && Object.keys(agents).length > 0 ? agents : undefined;
+  if (!entries) {
+    return {
+      default: {
+        displayName: "shellRaining",
+        id: "default",
+        piProfile: "default",
+        profileRoot: join(baseDir, "pi-profiles", "default"),
+      },
+    };
+  }
+
+  const resolved: Record<string, ResolvedAgentConfig> = {};
+  for (const agentId of Object.keys(entries).sort()) {
+    const agent = entries[agentId];
+    const piProfile = agent?.piProfile?.trim() || agentId;
+    assertSafePiProfileId(piProfile);
+    resolved[agentId] = {
+      displayName: agent?.displayName?.trim() || agentId,
+      id: agentId,
+      piProfile,
+      profileRoot: join(baseDir, "pi-profiles", piProfile),
+    };
+  }
+
+  return resolved;
+}
+
+function resolveDefaultAgent(
+  configuredDefaultAgent: string | undefined,
+  agents: Record<string, ResolvedAgentConfig>,
+): string {
+  const configured = configuredDefaultAgent?.trim();
+  if (configured && agents[configured]) {
+    return configured;
+  }
+  return Object.keys(agents).sort()[0] ?? "default";
+}
+
 function loadConfigFile(): ShellRainingConfigFile {
   const configPath = expandHome(
     process.env.SHELL_RAINING_CONFIG?.trim() || join(homedir(), ".shellRaining", "config.json"),
@@ -190,16 +242,8 @@ export function loadConfig(): Config {
       join(home, "shellRaining-workspace"),
     home,
   );
-  const agentDir = expandHome(
-    firstString(process.env.SHELL_RAINING_AGENT_DIR, fileConfig.paths?.agentDir) ||
-      join(baseDir, "agent"),
-    home,
-  );
-  const skillsDir = expandHome(
-    firstString(process.env.SHELL_RAINING_SKILLS_DIR, fileConfig.paths?.skillsDir) ||
-      join(home, "Documents", "dotfiles", "skills"),
-    home,
-  );
+  const agents = resolveAgents(fileConfig.agents, baseDir);
+  const defaultAgent = resolveDefaultAgent(fileConfig.telegram?.defaultAgent, agents);
   const allowedUsers = process.env.SHELL_RAINING_ALLOWED_USERS?.trim()
     ? process.env.SHELL_RAINING_ALLOWED_USERS.split(",")
         .map((id) => Number.parseInt(id.trim(), 10))
@@ -226,12 +270,12 @@ export function loadConfig(): Config {
     port,
     baseDir,
     workspace,
-    agentDir,
-    skillsDir,
+    defaultAgent,
+    agents,
     allowedUsers,
     showThinking: parseBoolean(
       process.env.SHELL_RAINING_SHOW_THINKING,
-      fileConfig.agent?.showThinking ?? false,
+      fileConfig.telegram?.showThinking ?? false,
     ),
     cron: {
       jobsPath: expandHome(
@@ -256,22 +300,6 @@ export function loadConfig(): Config {
           )
         : undefined,
       model: firstString(process.env.SHELL_RAINING_STT_MODEL, fileConfig.stt?.model),
-    },
-    providerBaseUrl: firstString(
-      process.env.SHELL_RAINING_PROVIDER_BASE_URL,
-      fileConfig.agent?.providerBaseUrl,
-    )
-      ? trimTrailingSlashes(
-          firstString(
-            process.env.SHELL_RAINING_PROVIDER_BASE_URL,
-            fileConfig.agent?.providerBaseUrl,
-          ) ?? "",
-        )
-      : undefined,
-    pi: {
-      settingsPath: join(agentDir, "settings.json"),
-      authPath: join(agentDir, "auth.json"),
-      modelsPath: join(agentDir, "models.json"),
     },
   };
 }

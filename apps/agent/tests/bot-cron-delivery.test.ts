@@ -28,7 +28,14 @@ vi.mock("../src/pi/runtime.js", () => ({
 
 function createConfig() {
   return {
-    agentDir: "/mock/agent",
+    agents: {
+      default: {
+        displayName: "shellRaining",
+        id: "default",
+        piProfile: "default",
+        profileRoot: "/mock/agent",
+      },
+    },
     allowedUsers: [],
     baseDir: "/mock/base",
     cron: {
@@ -36,14 +43,9 @@ function createConfig() {
       misfireGraceMs: 5 * 60 * 1000,
       runTimeoutMs: 5 * 60 * 1000,
     },
-    pi: {
-      settingsPath: "/mock/agent/settings.json",
-      authPath: "/mock/agent/auth.json",
-      modelsPath: "/mock/agent/models.json",
-    },
+    defaultAgent: "default",
     port: 1234,
     showThinking: false,
-    skillsDir: "/mock/skills",
     stt: {},
     telegramToken: "token",
     workspace: "/mock/workspace",

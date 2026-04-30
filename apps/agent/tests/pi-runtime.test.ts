@@ -22,27 +22,6 @@ const modelRegistryCtor = vi.fn(function ModelRegistryMock() {
   return { kind: "models", registerProvider };
 });
 const settingsManagerCreate = vi.fn(() => ({ kind: "settings" }));
-const skillWatcherAddPath = vi.fn(async () => undefined);
-const skillWatcherDispose = vi.fn(async () => undefined);
-const skillWatcherCtor = vi.fn(function SkillWatcherMock() {
-  return {
-    addPath: skillWatcherAddPath,
-    dispose: skillWatcherDispose,
-  };
-});
-const loadSkills = vi.fn(() => ({
-  diagnostics: [],
-  skills: [
-    {
-      baseDir: "/mock/skills/example",
-      description: "Example skill",
-      disableModelInvocation: false,
-      filePath: "/mock/skills/example/SKILL.md",
-      name: "example",
-      sourceInfo: { source: "test" },
-    },
-  ],
-}));
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(async () => undefined),
@@ -63,7 +42,6 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
     },
   })),
   DefaultResourceLoader: defaultResourceLoader,
-  loadSkills,
   ModelRegistry: modelRegistryCtor,
   SettingsManager: { create: settingsManagerCreate },
   SessionManager: {
@@ -73,13 +51,16 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   },
 }));
 
-vi.mock("../src/pi/skill-watcher.js", () => ({
-  SkillWatcher: skillWatcherCtor,
-}));
-
 function createRuntimeConfig() {
   return {
-    agentDir: "/mock/agent",
+    agents: {
+      default: {
+        displayName: "shellRaining",
+        id: "default",
+        piProfile: "default",
+        profileRoot: "/mock/agent",
+      },
+    },
     allowedUsers: [],
     baseDir: "/mock/base",
     cron: {
@@ -87,14 +68,9 @@ function createRuntimeConfig() {
       misfireGraceMs: 5 * 60 * 1000,
       runTimeoutMs: 5 * 60 * 1000,
     },
-    pi: {
-      settingsPath: "/mock/base/agent/settings.json",
-      authPath: "/mock/base/agent/auth.json",
-      modelsPath: "/mock/base/agent/models.json",
-    },
+    defaultAgent: "default",
     port: 1234,
     showThinking: false,
-    skillsDir: "/mock/skills",
     stt: {},
     telegramToken: "token",
     workspace: "/mock/workspace",
@@ -118,27 +94,6 @@ describe("PiRuntime", () => {
     });
     settingsManagerCreate.mockReturnValue({ kind: "settings" });
     registerProvider.mockReturnValue(undefined);
-    skillWatcherAddPath.mockResolvedValue(undefined);
-    skillWatcherDispose.mockResolvedValue(undefined);
-    loadSkills.mockReturnValue({
-      diagnostics: [],
-      skills: [
-        {
-          baseDir: "/mock/skills/example",
-          description: "Example skill",
-          disableModelInvocation: false,
-          filePath: "/mock/skills/example/SKILL.md",
-          name: "example",
-          sourceInfo: { source: "test" },
-        },
-      ],
-    });
-    skillWatcherCtor.mockImplementation(function SkillWatcherMock() {
-      return {
-        addPath: skillWatcherAddPath,
-        dispose: skillWatcherDispose,
-      };
-    });
   });
 
   it("passes extension factories from builder into the Pi resource loader", async () => {
@@ -157,53 +112,15 @@ describe("PiRuntime", () => {
     );
   });
 
-  it("loads only configured shellRaining skills through the Pi resource loader", async () => {
-    const { PiRuntime } = await import("../src/pi/runtime.js");
-    const runtime = new PiRuntime(createRuntimeConfig());
-
-    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
-
-    expect(loadSkills).toHaveBeenCalledWith({
-      includeDefaults: false,
-      skillPaths: ["/mock/skills"],
-    });
-
-    const options = defaultResourceLoader.mock.calls.at(0)?.at(0) as unknown as {
-      noSkills?: boolean;
-      skillsOverride?: (base: { diagnostics: unknown[]; skills: unknown[] }) => {
-        diagnostics: unknown[];
-        skills: unknown[];
-      };
-    };
-
-    expect(options.noSkills).toBe(true);
-    expect(options.skillsOverride?.({ diagnostics: [], skills: [] })).toEqual({
-      diagnostics: [],
-      skills: [
-        {
-          baseDir: "/mock/skills/example",
-          description: "Example skill",
-          disableModelInvocation: false,
-          filePath: "/mock/skills/example/SKILL.md",
-          name: "example",
-          sourceInfo: { source: "test" },
-        },
-      ],
-    });
-  });
-
-  it("uses shellRaining-owned Pi-compatible settings, auth, and models files", async () => {
+  it("uses the default agent profile root for Pi-owned settings, auth, and models files", async () => {
     const { createAgentSession } = await import("@mariozechner/pi-coding-agent");
     const { PiRuntime } = await import("../src/pi/runtime.js");
     const runtime = new PiRuntime(createRuntimeConfig());
 
     await runtime.prompt("telegram__1", "hello", "/mock/workspace");
 
-    expect(authStorageCreate).toHaveBeenCalledWith("/mock/base/agent/auth.json");
-    expect(modelRegistryCtor).toHaveBeenCalledWith(
-      { kind: "auth" },
-      "/mock/base/agent/models.json",
-    );
+    expect(authStorageCreate).toHaveBeenCalledWith("/mock/agent/auth.json");
+    expect(modelRegistryCtor).toHaveBeenCalledWith({ kind: "auth" }, "/mock/agent/models.json");
     expect(settingsManagerCreate).toHaveBeenCalledWith("/mock/workspace", "/mock/agent");
     expect(defaultResourceLoader).toHaveBeenCalledWith(
       expect.objectContaining({ settingsManager: { kind: "settings" } }),
@@ -215,20 +132,6 @@ describe("PiRuntime", () => {
         settingsManager: { kind: "settings" },
       }),
     );
-  });
-
-  it("keeps providerBaseUrl as a compatibility provider override", async () => {
-    const { PiRuntime } = await import("../src/pi/runtime.js");
-    const runtime = new PiRuntime({
-      ...createRuntimeConfig(),
-      providerBaseUrl: "https://provider.example.com/v1",
-    });
-
-    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
-
-    expect(registerProvider).toHaveBeenCalledWith("shellraining", {
-      baseUrl: "https://provider.example.com/v1",
-    });
   });
 
   it("appends the shellRaining system prompt through the Pi resource loader", async () => {
@@ -308,37 +211,7 @@ describe("PiRuntime", () => {
     });
   });
 
-  it("watches only the configured shellRaining skills directory", async () => {
-    const { PiRuntime } = await import("../src/pi/runtime.js");
-    const runtime = new PiRuntime(createRuntimeConfig());
-
-    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
-
-    expect(skillWatcherCtor).toHaveBeenCalledWith(
-      expect.objectContaining({
-        paths: ["/mock/skills"],
-        debounceMs: 500,
-      }),
-    );
-  });
-
-  it("reloads the resource loader and rebuilds the system prompt after skill changes", async () => {
-    const { PiRuntime } = await import("../src/pi/runtime.js");
-    const runtime = new PiRuntime(createRuntimeConfig());
-
-    await runtime.prompt("telegram__1", "hello", "/mock/workspace");
-
-    const options = skillWatcherCtor.mock.calls.at(0)?.at(0) as unknown as {
-      onReload: () => Promise<void>;
-    };
-    await options.onReload();
-
-    expect(resourceLoaderReload).toHaveBeenCalledTimes(2);
-    expect(sessionGetActiveToolNames).toHaveBeenCalledTimes(1);
-    expect(sessionSetActiveToolsByName).toHaveBeenCalledWith(["read", "bash"]);
-  });
-
-  it("disposes sessions and the skill watcher", async () => {
+  it("disposes sessions", async () => {
     const { PiRuntime } = await import("../src/pi/runtime.js");
     const runtime = new PiRuntime(createRuntimeConfig());
 
@@ -346,6 +219,5 @@ describe("PiRuntime", () => {
     await runtime.dispose();
 
     expect(sessionDispose).toHaveBeenCalledTimes(1);
-    expect(skillWatcherDispose).toHaveBeenCalledTimes(1);
   });
 });
