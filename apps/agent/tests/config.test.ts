@@ -26,13 +26,13 @@ describe("config", () => {
   it("throws when TELEGRAM_BOT_TOKEN is missing", async () => {
     delete process.env.TELEGRAM_BOT_TOKEN;
     const { loadConfig } = await import("../src/config.js");
-    expect(() => loadConfig()).toThrow("TELEGRAM_BOT_TOKEN is required");
+    await expect(loadConfig()).rejects.toThrow("TELEGRAM_BOT_TOKEN is required");
   });
 
   it("uses shellRaining defaults", async () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
     expect(config.workspace).toBe("/mock/home/shellRaining-workspace");
     expect(config.baseDir).toBe("/mock/home/.shellRaining");
     expect(config.defaultAgent).toBe("default");
@@ -82,7 +82,7 @@ describe("config", () => {
     delete process.env.TELEGRAM_BOT_TOKEN;
 
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
 
     expect(config.defaultAgent).toBe("coder");
     expect(config.agents).toEqual({
@@ -120,7 +120,7 @@ describe("config", () => {
 
     const { loadConfig } = await import("../src/config.js");
 
-    expect(() => loadConfig()).toThrow("Invalid Pi profile id");
+    await expect(loadConfig()).rejects.toThrow("Invalid Pi profile id");
   });
 
   it("uses the first sorted agent when defaultAgent is not configured", async () => {
@@ -141,7 +141,7 @@ describe("config", () => {
 
     const { loadConfig } = await import("../src/config.js");
 
-    expect(loadConfig().defaultAgent).toBe("coder");
+    await expect(loadConfig()).resolves.toHaveProperty("defaultAgent", "coder");
   });
 
   it("rejects defaultAgent values that do not reference a configured agent", async () => {
@@ -161,7 +161,7 @@ describe("config", () => {
 
     const { loadConfig } = await import("../src/config.js");
 
-    expect(() => loadConfig()).toThrow("Default agent is not configured: missing");
+    await expect(loadConfig()).rejects.toThrow("Default agent is not configured: missing");
   });
 
   it("rejects unsafe agent ids", async () => {
@@ -181,7 +181,7 @@ describe("config", () => {
 
     const { loadConfig } = await import("../src/config.js");
 
-    expect(() => loadConfig()).toThrow("Invalid agent id");
+    await expect(loadConfig()).rejects.toThrow("Invalid agent id");
   });
 
   it("rejects unsafe agent aliases", async () => {
@@ -201,7 +201,7 @@ describe("config", () => {
 
     const { loadConfig } = await import("../src/config.js");
 
-    expect(() => loadConfig()).toThrow("Invalid agent alias");
+    await expect(loadConfig()).rejects.toThrow("Invalid agent alias");
   });
 
   it("rejects aliases that conflict with agent ids or other aliases", async () => {
@@ -222,7 +222,7 @@ describe("config", () => {
 
     const { loadConfig } = await import("../src/config.js");
 
-    expect(() => loadConfig()).toThrow("Duplicate agent alias or id: reviewer");
+    await expect(loadConfig()).rejects.toThrow("Duplicate agent alias or id: reviewer");
   });
 
   it("rejects duplicate aliases across agents", async () => {
@@ -243,7 +243,7 @@ describe("config", () => {
 
     const { loadConfig } = await import("../src/config.js");
 
-    expect(() => loadConfig()).toThrow("Duplicate agent alias or id: shared");
+    await expect(loadConfig()).rejects.toThrow("Duplicate agent alias or id: shared");
   });
 
   it("loads shellRaining config file values", async () => {
@@ -280,7 +280,7 @@ describe("config", () => {
     delete process.env.TELEGRAM_BOT_TOKEN;
 
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
 
     expect(config.telegramToken).toBe("file-token");
     expect(config.telegramApiBaseUrl).toBe("https://telegram.example.com");
@@ -320,7 +320,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_SHOW_THINKING = "true";
 
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
 
     expect(config.telegramToken).toBe("env-token");
     expect(config.port).toBe(9876);
@@ -332,6 +332,51 @@ describe("config", () => {
     );
   });
 
+  it("loads shellRaining config through C12-supported JSONC files", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "shellraining.config.jsonc");
+    await writeFile(
+      configPath,
+      `{
+        // C12 handles common config file formats while shellRaining keeps ownership boundaries.
+        "server": { "port": 4567 },
+        "telegram": { "botToken": "file-token" },
+        "paths": { "baseDir": ${JSON.stringify(join(tempDir, "base"))} }
+      }`,
+    );
+
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = await loadConfig();
+
+    expect(config.telegramToken).toBe("file-token");
+    expect(config.port).toBe(4567);
+    expect(config.agents.default?.profileRoot).toBe(
+      join(tempDir, "base", "pi-profiles", "default"),
+    );
+  });
+
+  it("does not merge sibling Pi profile settings into shellRaining config", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(configPath, JSON.stringify({ telegram: { botToken: "file-token" } }));
+    await writeFile(
+      join(tempDir, "settings.json"),
+      JSON.stringify({ telegram: { botToken: "pi-token" }, server: { port: 4567 } }),
+    );
+
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = await loadConfig();
+
+    expect(config.telegramToken).toBe("file-token");
+    expect(config.port).toBe(3457);
+  });
+
   it("loads cron storage and timeout defaults", async () => {
     process.env.TELEGRAM_BOT_TOKEN = "token";
     delete process.env.SHELL_RAINING_CRON_JOBS_PATH;
@@ -339,7 +384,7 @@ describe("config", () => {
     delete process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS;
 
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
 
     expect(config.cron.jobsPath).toContain(".shellRaining/cron/jobs.json");
     expect(config.cron.runTimeoutMs).toBe(5 * 60 * 1000);
@@ -353,7 +398,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS = " 45000 ";
 
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
 
     expect(config.cron.jobsPath).toBe("/tmp/custom-cron/jobs.json");
     expect(config.cron.runTimeoutMs).toBe(120000);
@@ -366,7 +411,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS = "   ";
 
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
 
     expect(config.cron.runTimeoutMs).toBe(5 * 60 * 1000);
     expect(config.cron.misfireGraceMs).toBe(5 * 60 * 1000);
@@ -376,7 +421,7 @@ describe("config", () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
     process.env.SHELL_RAINING_ALLOWED_USERS = "123,456";
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
     expect(config.allowedUsers).toEqual([123, 456]);
   });
 
@@ -387,7 +432,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_STT_MODEL = " faster-whisper-large-v3 ";
 
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
 
     expect(config.stt).toEqual({
       apiKey: "stt-secret",
@@ -401,7 +446,7 @@ describe("config", () => {
     process.env.TELEGRAM_API_BASE_URL = " http://127.0.0.1:8081/ ";
 
     const { loadConfig } = await import("../src/config.js");
-    const config = loadConfig();
+    const config = await loadConfig();
 
     expect(config.telegramApiBaseUrl).toBe("http://127.0.0.1:8081");
   });

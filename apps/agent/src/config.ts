@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { loadConfig as loadC12Config } from "c12";
 
 /** Application configuration loaded from environment variables (or `.env` file). */
 export interface Config {
@@ -255,7 +256,7 @@ function resolveDefaultAgent(
   return Object.keys(agents).sort()[0] ?? "default";
 }
 
-function loadConfigFile(): ShellRainingConfigFile {
+async function loadConfigFile(): Promise<ShellRainingConfigFile> {
   const configPath = expandHome(
     process.env.SHELL_RAINING_CONFIG?.trim() || join(homedir(), ".shellRaining", "config.json"),
   );
@@ -263,7 +264,18 @@ function loadConfigFile(): ShellRainingConfigFile {
     return {};
   }
 
-  return JSON.parse(readFileSync(configPath, "utf-8")) as ShellRainingConfigFile;
+  const { config } = await loadC12Config<ShellRainingConfigFile>({
+    configFile: configPath,
+    configFileRequired: true,
+    cwd: dirname(configPath),
+    dotenv: false,
+    envName: false,
+    globalRc: false,
+    packageJson: false,
+    rcFile: false,
+  });
+
+  return config;
 }
 
 function parseCronNumber(value: string | undefined, defaultValue: number): number {
@@ -275,8 +287,8 @@ function parseCronNumber(value: string | undefined, defaultValue: number): numbe
   return Number.isNaN(parsed) ? defaultValue : parsed;
 }
 
-export function loadConfig(): Config {
-  const fileConfig = loadConfigFile();
+export async function loadConfig(): Promise<Config> {
+  const fileConfig = await loadConfigFile();
   const token = firstString(process.env.TELEGRAM_BOT_TOKEN, fileConfig.telegram?.botToken);
   if (!token) {
     throw new Error("TELEGRAM_BOT_TOKEN is required. Set it in .env file.");

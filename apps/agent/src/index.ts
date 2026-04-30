@@ -34,7 +34,7 @@ if (
   undici.setGlobalDispatcher(new undici.EnvHttpProxyAgent());
 }
 
-const config = loadConfig();
+const config = await loadConfig();
 const cronStore = new CronStore<AgentCronPayload, AgentCronOwner>(config.cron.jobsPath);
 
 async function execCommand(command: string, cwd: string, timeoutMs: number) {
