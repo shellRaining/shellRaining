@@ -55,6 +55,7 @@ function createRuntimeConfig() {
   return {
     agents: {
       default: {
+        aliases: [],
         displayName: "shellRaining",
         id: "default",
         piProfile: "default",

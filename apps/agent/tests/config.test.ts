@@ -38,6 +38,7 @@ describe("config", () => {
     expect(config.defaultAgent).toBe("default");
     expect(config.agents).toEqual({
       default: {
+        aliases: [],
         displayName: "shellRaining",
         id: "default",
         piProfile: "default",
@@ -67,10 +68,12 @@ describe("config", () => {
           reviewer: {
             displayName: "Reviewer",
             piProfile: "reviewer-profile",
+            aliases: ["review", "check"],
           },
           coder: {
             displayName: "Coder",
             piProfile: "coder-profile",
+            aliases: [" code ", "", "dev", "code"],
           },
         },
       }),
@@ -84,12 +87,14 @@ describe("config", () => {
     expect(config.defaultAgent).toBe("coder");
     expect(config.agents).toEqual({
       coder: {
+        aliases: ["code", "dev"],
         displayName: "Coder",
         id: "coder",
         piProfile: "coder-profile",
         profileRoot: join(tempDir, "base", "pi-profiles", "coder-profile"),
       },
       reviewer: {
+        aliases: ["review", "check"],
         displayName: "Reviewer",
         id: "reviewer",
         piProfile: "reviewer-profile",
@@ -116,6 +121,129 @@ describe("config", () => {
     const { loadConfig } = await import("../src/config.js");
 
     expect(() => loadConfig()).toThrow("Invalid Pi profile id");
+  });
+
+  it("uses the first sorted agent when defaultAgent is not configured", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        agents: {
+          reviewer: { piProfile: "reviewer" },
+          coder: { piProfile: "coder" },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    expect(loadConfig().defaultAgent).toBe("coder");
+  });
+
+  it("rejects defaultAgent values that do not reference a configured agent", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token", defaultAgent: "missing" },
+        agents: {
+          coder: { piProfile: "coder" },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    expect(() => loadConfig()).toThrow("Default agent is not configured: missing");
+  });
+
+  it("rejects unsafe agent ids", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        agents: {
+          "../coder": { piProfile: "coder" },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    expect(() => loadConfig()).toThrow("Invalid agent id");
+  });
+
+  it("rejects unsafe agent aliases", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        agents: {
+          coder: { aliases: ["../code"] },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    expect(() => loadConfig()).toThrow("Invalid agent alias");
+  });
+
+  it("rejects aliases that conflict with agent ids or other aliases", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        agents: {
+          coder: { aliases: ["reviewer"] },
+          reviewer: { aliases: ["code"] },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    expect(() => loadConfig()).toThrow("Duplicate agent alias or id: reviewer");
+  });
+
+  it("rejects duplicate aliases across agents", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        agents: {
+          coder: { aliases: ["shared"] },
+          reviewer: { aliases: ["shared"] },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    expect(() => loadConfig()).toThrow("Duplicate agent alias or id: shared");
   });
 
   it("loads shellRaining config file values", async () => {

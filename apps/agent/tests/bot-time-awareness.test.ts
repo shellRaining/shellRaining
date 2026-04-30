@@ -73,6 +73,7 @@ function createConfig() {
   return {
     agents: {
       default: {
+        aliases: [],
         displayName: "shellRaining",
         id: "default",
         piProfile: "default",
