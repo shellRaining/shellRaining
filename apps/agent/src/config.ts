@@ -233,6 +233,78 @@ function normalizeAliases(aliases: string[] | undefined): string[] {
   return normalized;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function warnLegacyConfigField(configPath: string, fieldPath: string, message: string): void {
+  console.warn(
+    `Deprecated shellRaining config field ${fieldPath} in ${configPath} is ignored. ${message}`,
+  );
+}
+
+function normalizeLegacyConfig(config: unknown, configPath: string): unknown {
+  if (!isRecord(config)) {
+    return config;
+  }
+
+  const normalized: Record<string, unknown> = { ...config };
+  const paths = isRecord(normalized.paths) ? { ...normalized.paths } : undefined;
+  if (paths && "agentDir" in paths) {
+    warnLegacyConfigField(
+      configPath,
+      "paths.agentDir",
+      "Move Pi profile files to the active profile root under paths.baseDir/pi-profiles/<profile-id>.",
+    );
+    delete paths.agentDir;
+  }
+  if (paths && "skillsDir" in paths) {
+    warnLegacyConfigField(
+      configPath,
+      "paths.skillsDir",
+      "Move this value to the active Pi profile settings.json as the Pi settings field skills.",
+    );
+    delete paths.skillsDir;
+  }
+  if (paths) {
+    normalized.paths = paths;
+  }
+
+  if (isRecord(normalized.agent)) {
+    const legacyAgent = { ...normalized.agent };
+    if (typeof legacyAgent.showThinking === "boolean") {
+      const telegram = isRecord(normalized.telegram) ? { ...normalized.telegram } : {};
+      if (telegram.showThinking === undefined) {
+        telegram.showThinking = legacyAgent.showThinking;
+        console.warn(
+          `Deprecated shellRaining config field agent.showThinking in ${configPath} was mapped to telegram.showThinking.`,
+        );
+      } else {
+        console.warn(
+          `Deprecated shellRaining config field agent.showThinking in ${configPath} is ignored because telegram.showThinking is already configured.`,
+        );
+      }
+      normalized.telegram = telegram;
+      delete legacyAgent.showThinking;
+    }
+    if ("providerBaseUrl" in legacyAgent) {
+      warnLegacyConfigField(
+        configPath,
+        "agent.providerBaseUrl",
+        "Move provider definitions to the active Pi profile models.json.",
+      );
+      delete legacyAgent.providerBaseUrl;
+    }
+    if (Object.keys(legacyAgent).length === 0) {
+      delete normalized.agent;
+    } else {
+      normalized.agent = legacyAgent;
+    }
+  }
+
+  return normalized;
+}
+
 function resolveAgents(
   agents: ShellRainingConfigFile["agents"],
   baseDir: string,
@@ -316,13 +388,14 @@ async function loadConfigFile(): Promise<ShellRainingConfigFile> {
     rcFile: false,
   });
 
-  const errors = [...Value.Errors(shellRainingConfigFileSchema, config)];
+  const normalizedConfig = normalizeLegacyConfig(config, configPath);
+  const errors = [...Value.Errors(shellRainingConfigFileSchema, normalizedConfig)];
   if (errors.length > 0) {
     const details = errors.map((error) => `${error.path || "/"}: ${error.message}`).join("; ");
     throw new Error(`Invalid shellRaining config file ${configPath}: ${details}`);
   }
 
-  return config as ShellRainingConfigFile;
+  return normalizedConfig as ShellRainingConfigFile;
 }
 
 function parseCronNumber(value: string | undefined, defaultValue: number): number {

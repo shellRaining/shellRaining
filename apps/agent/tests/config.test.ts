@@ -429,6 +429,128 @@ describe("config", () => {
     expect(schema).toEqual(JSON.parse(JSON.stringify(shellRainingConfigFileSchema)));
   });
 
+  it("migrates legacy agent.showThinking to telegram.showThinking", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({ telegram: { botToken: "file-token" }, agent: { showThinking: true } }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = await loadConfig();
+
+    expect(config.showThinking).toBe(true);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("Deprecated shellRaining config field agent.showThinking"),
+    );
+    warn.mockRestore();
+  });
+
+  it("warns and ignores legacy Pi-owned shellRaining config fields before strict validation", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        paths: { agentDir: "~/.shellRaining/agent", skillsDir: "~/skills" },
+        agent: { providerBaseUrl: "http://127.0.0.1:11434" },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = await loadConfig();
+
+    expect(config.agents.default?.profileRoot).toBe("/mock/home/.shellRaining/pi-profiles/default");
+    expect(warn.mock.calls.map(([message]) => message)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Deprecated shellRaining config field paths.agentDir"),
+        expect.stringContaining("Deprecated shellRaining config field paths.skillsDir"),
+        expect.stringContaining("Deprecated shellRaining config field agent.providerBaseUrl"),
+      ]),
+    );
+    warn.mockRestore();
+  });
+
+  it("keeps telegram.showThinking preferred over legacy agent.showThinking", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token", showThinking: false },
+        agent: { showThinking: true },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+    const config = await loadConfig();
+
+    expect(config.showThinking).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("ignored because telegram.showThinking is already configured"),
+    );
+    warn.mockRestore();
+  });
+
+  it("rejects unknown agent fields after legacy config normalization", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({ telegram: { botToken: "file-token" }, agent: { unknown: true } }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*\/agent/);
+  });
+
+  it("rejects invalid legacy agent.showThinking types", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({ telegram: { botToken: "file-token" }, agent: { showThinking: "true" } }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*\/agent/);
+  });
+
+  it("still rejects unknown paths fields after legacy config normalization", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        paths: { agentDir: "~/.shellRaining/agent", unknown: true },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*\/paths\/unknown/);
+  });
+
   it("loads cron storage and timeout defaults", async () => {
     process.env.TELEGRAM_BOT_TOKEN = "token";
     delete process.env.SHELL_RAINING_CRON_JOBS_PATH;
