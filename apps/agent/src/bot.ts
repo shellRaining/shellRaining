@@ -21,6 +21,13 @@ import {
 import { PiRuntime } from "./pi/runtime.js";
 import { getThreadKeyFromId } from "./pi/session-store.js";
 
+function getDefaultRuntimeScope(
+  config: Config,
+  threadKey: string,
+): { agentId: string; threadKey: string } {
+  return { agentId: config.defaultAgent, threadKey };
+}
+
 /** Strips the `@botname` suffix that Telegram adds in group mentions (e.g. `/start@mybot` → `/start`). */
 function parseCommand(
   messageText: string | null | undefined,
@@ -136,6 +143,7 @@ async function handleCommand(
   }
 
   const threadKey = getThreadKeyFromId(thread.id);
+  const scope = getDefaultRuntimeScope(config, threadKey);
   const currentWorkspace = await getWorkspace(threadKey, config.workspace);
 
   switch (parsed.command) {
@@ -172,12 +180,12 @@ async function handleCommand(
       return true;
     }
     case "new":
-      await runtime.newSession(threadKey, currentWorkspace);
+      await runtime.newSession(scope, currentWorkspace);
       await thread.post("已创建新会话。后续消息会使用新的 Pi session。");
       return true;
     case "session": {
       if (!parsed.args) {
-        const sessions = await runtime.listSessions(threadKey, currentWorkspace);
+        const sessions = await runtime.listSessions(scope, currentWorkspace);
         if (sessions.length === 0) {
           await thread.post("当前还没有可切换的 session。\n直接发送消息即可创建新的 Pi session。");
           return true;
@@ -199,7 +207,7 @@ async function handleCommand(
         return true;
       }
 
-      const sessions = await runtime.listSessions(threadKey, currentWorkspace);
+      const sessions = await runtime.listSessions(scope, currentWorkspace);
       const index = Number.parseInt(match[1], 10) - 1;
       const target = sessions[index];
       if (!target) {
@@ -207,7 +215,7 @@ async function handleCommand(
         return true;
       }
 
-      const switched = await runtime.switchSession(threadKey, currentWorkspace, target.path);
+      const switched = await runtime.switchSession(scope, currentWorkspace, target.path);
       await thread.post(switched ? `已切换到 session：${target.path}` : "session 切换被取消。");
       return true;
     }
@@ -248,6 +256,7 @@ async function handlePrompt(
   runtime: PiRuntime,
 ): Promise<void> {
   const threadKey = getThreadKeyFromId(thread.id);
+  const scope = getDefaultRuntimeScope(config, threadKey);
   if (!hasPotentialTelegramInput(message)) {
     await thread.post("没有识别到可处理的 Telegram 输入。请发送文本、图片、文件、语音或贴纸。");
     return;
@@ -266,10 +275,10 @@ async function handlePrompt(
 
   const promptText = injectPromptTimestampPrefix(normalized.text);
 
-  if (runtime.isRunning(threadKey)) {
+  if (runtime.isRunning(scope)) {
     // 消息注入到正在运行的 session，最终回复由最初那条 prompt 的 handler 统一发送，
     // 这里必须 return，避免两条 handler 都对同一份输出调用 replyLong 造成重复回复。
-    await runtime.steer(threadKey, promptText, normalized.images);
+    await runtime.steer(scope, promptText, normalized.images);
     return;
   }
 
@@ -278,7 +287,7 @@ async function handlePrompt(
   const beforeSnapshot = await snapshotWorkspace(workspace);
   await thread.startTyping();
 
-  const result = await runtime.prompt(threadKey, promptText, workspace, {
+  const result = await runtime.prompt(scope, promptText, workspace, {
     images: normalized.images,
     onStatus: async (status) => {
       await thread.startTyping(status);

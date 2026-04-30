@@ -152,6 +152,10 @@ describe("bot time awareness", () => {
     await onDirectMessageHandler?.(thread, message);
 
     expect(runtimePrompt).toHaveBeenCalledTimes(1);
+    expect(runtimePrompt.mock.calls[0]?.[0]).toEqual({
+      agentId: "default",
+      threadKey: "telegram__1",
+    });
     expect(runtimePrompt.mock.calls[0]?.[1]).toContain("帮我总结今天做过的事情");
     expect(runtimePrompt.mock.calls[0]?.[1]).toContain("[Thu 2026-04-16 09:00 UTC]");
 
@@ -189,6 +193,7 @@ describe("bot time awareness", () => {
     await onDirectMessageHandler?.(thread, message);
 
     expect(steer).toHaveBeenCalledTimes(1);
+    expect(steer.mock.calls[0]?.[0]).toEqual({ agentId: "default", threadKey: "telegram__1" });
     expect(steer.mock.calls[0]?.[1]).toContain("继续刚才那个任务");
     expect(steer.mock.calls[0]?.[1]).toContain("[Thu 2026-04-16 09:00 UTC]");
 

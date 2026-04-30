@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { access, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   createAgentSession,
@@ -13,7 +13,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
-import { getSessionDirectoryForThread } from "./session-store.js";
+import { getSessionDirectoryForScope, getSessionDirectoryForThread } from "./session-store.js";
 
 export interface PiPromptResult {
   artifactsOutput: string;
@@ -32,14 +32,22 @@ export interface PiPromptCallbacks {
   onStatus?: (status: string) => Promise<void> | void;
 }
 
+export interface RuntimeScope {
+  agentId: string;
+  threadKey: string;
+}
+
 interface PiRuntimeOptions {
   extensionFactories?: (threadKey: string) => ExtensionFactory[];
 }
 
 interface CachedSession {
   cwd: string;
+  sessionDir: string;
   session: Awaited<ReturnType<typeof createAgentSession>>["session"];
 }
+
+type RuntimeScopeInput = RuntimeScope | string;
 
 interface AssistantErrorMessage {
   errorMessage?: unknown;
@@ -64,12 +72,22 @@ function getAssistantErrorMessage(event: AgentSessionEvent): string | undefined 
   return message.errorMessage.trim() || undefined;
 }
 
+function getScopeKey(scope: RuntimeScope): string {
+  return JSON.stringify([scope.agentId, scope.threadKey]);
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export class PiRuntime {
   private readonly sessions = new Map<string, CachedSession>();
-  /**
-   * Tracks in-flight prompt executions per thread so that `steer()` can
-   * await the running promise when injecting a mid-session message.
-   */
+  /** Tracks in-flight prompt executions per runtime scope for mid-session steering. */
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
 
   constructor(
@@ -78,13 +96,13 @@ export class PiRuntime {
   ) {}
 
   private async createSession(
-    threadKey: string,
+    scope: RuntimeScope,
     cwd: string,
     mode: "continue" | "new",
   ): Promise<CachedSession> {
-    const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
+    const profileRoot = this.getAgentProfileRoot(scope.agentId);
+    const sessionDir = await this.resolveSessionDir(scope, mode);
     await mkdir(sessionDir, { recursive: true });
-    const profileRoot = this.getDefaultProfileRoot();
     const authStorage = AuthStorage.create(join(profileRoot, "auth.json"));
     const modelRegistry = new ModelRegistry(authStorage, join(profileRoot, "models.json"));
     const settingsManager = SettingsManager.create(cwd, profileRoot);
@@ -93,7 +111,7 @@ export class PiRuntime {
       cwd,
       agentDir: profileRoot,
       settingsManager,
-      extensionFactories: this.options.extensionFactories?.(threadKey),
+      extensionFactories: this.options.extensionFactories?.(scope.threadKey),
       appendSystemPromptOverride: (base) => [
         ...base,
         buildShellRainingSystemPrompt({
@@ -120,57 +138,84 @@ export class PiRuntime {
           : SessionManager.continueRecent(cwd, sessionDir),
     });
 
-    const cached = { cwd, session };
-    this.sessions.set(threadKey, cached);
+    const cached = { cwd, session, sessionDir };
+    this.sessions.set(getScopeKey(scope), cached);
 
     return cached;
   }
 
-  private getDefaultProfileRoot(): string {
-    const agent = this.config.agents[this.config.defaultAgent];
+  private async resolveSessionDir(scope: RuntimeScope, mode: "continue" | "new"): Promise<string> {
+    const scopedSessionDir = getSessionDirectoryForScope(this.config.baseDir, scope);
+    if (mode === "continue" && scope.agentId === this.config.defaultAgent) {
+      const legacySessionDir = getSessionDirectoryForThread(this.config.baseDir, scope.threadKey);
+      if (!(await pathExists(scopedSessionDir)) && (await pathExists(legacySessionDir))) {
+        return legacySessionDir;
+      }
+    }
+    return scopedSessionDir;
+  }
+
+  private getAgentProfileRoot(agentId: string): string {
+    const agent = this.config.agents[agentId];
     if (!agent) {
-      throw new Error(`Default agent is not configured: ${this.config.defaultAgent}`);
+      throw new Error(`Agent is not configured: ${agentId}`);
     }
     return agent.profileRoot;
   }
 
-  private async getOrCreateSession(threadKey: string, cwd: string): Promise<CachedSession> {
-    const existing = this.sessions.get(threadKey);
+  private normalizeScope(input: RuntimeScopeInput): RuntimeScope {
+    if (typeof input === "string") {
+      return { agentId: this.config.defaultAgent, threadKey: input };
+    }
+    return input;
+  }
+
+  private async getOrCreateSession(scope: RuntimeScope, cwd: string): Promise<CachedSession> {
+    const scopeKey = getScopeKey(scope);
+    const existing = this.sessions.get(scopeKey);
     if (existing && existing.cwd === cwd) {
       return existing;
     }
 
     if (existing && existing.cwd !== cwd) {
       existing.session.dispose();
-      this.sessions.delete(threadKey);
+      this.sessions.delete(scopeKey);
     }
 
-    return this.createSession(threadKey, cwd, "continue");
+    return this.createSession(scope, cwd, "continue");
   }
 
-  async newSession(threadKey: string, cwd: string): Promise<void> {
-    const existing = this.sessions.get(threadKey);
+  async newSession(scopeInput: RuntimeScopeInput, cwd: string): Promise<void> {
+    const scope = this.normalizeScope(scopeInput);
+    const scopeKey = getScopeKey(scope);
+    const existing = this.sessions.get(scopeKey);
     if (existing) {
       existing.session.dispose();
-      this.sessions.delete(threadKey);
+      this.sessions.delete(scopeKey);
     }
 
-    await this.createSession(threadKey, cwd, "new");
+    await this.createSession(scope, cwd, "new");
   }
 
-  async listSessions(threadKey: string, cwd: string): Promise<SessionInfo[]> {
-    const sessionDir = getSessionDirectoryForThread(this.config.baseDir, threadKey);
+  async listSessions(scopeInput: RuntimeScopeInput, cwd: string): Promise<SessionInfo[]> {
+    const scope = this.normalizeScope(scopeInput);
+    const sessionDir = getSessionDirectoryForScope(this.config.baseDir, scope);
     await mkdir(sessionDir, { recursive: true });
     return SessionManager.list(cwd, sessionDir);
   }
 
-  async switchSession(threadKey: string, cwd: string, sessionPath: string): Promise<boolean> {
-    const { session } = await this.getOrCreateSession(threadKey, cwd);
+  async switchSession(
+    scopeInput: RuntimeScopeInput,
+    cwd: string,
+    sessionPath: string,
+  ): Promise<boolean> {
+    const scope = this.normalizeScope(scopeInput);
+    const { session } = await this.getOrCreateSession(scope, cwd);
     return session.switchSession(sessionPath);
   }
 
-  isRunning(threadKey: string): boolean {
-    return this.inflight.has(threadKey);
+  isRunning(scopeInput: RuntimeScopeInput): boolean {
+    return this.inflight.has(getScopeKey(this.normalizeScope(scopeInput)));
   }
 
   /**
@@ -180,13 +225,15 @@ export class PiRuntime {
    * caller, so this method deliberately does not await or return it to avoid
    * double-sending the same output to the user.
    */
-  async steer(threadKey: string, text: string, images?: PiImageInput[]): Promise<void> {
-    const cached = this.sessions.get(threadKey);
+  async steer(scopeInput: RuntimeScopeInput, text: string, images?: PiImageInput[]): Promise<void> {
+    const scope = this.normalizeScope(scopeInput);
+    const scopeKey = getScopeKey(scope);
+    const cached = this.sessions.get(scopeKey);
     if (!cached) {
-      throw new Error(`No active session for thread: ${threadKey}`);
+      throw new Error(`No active session for scope: ${scope.agentId}/${scope.threadKey}`);
     }
-    if (!this.inflight.has(threadKey)) {
-      throw new Error(`No inflight prompt for thread: ${threadKey}`);
+    if (!this.inflight.has(scopeKey)) {
+      throw new Error(`No inflight prompt for scope: ${scope.agentId}/${scope.threadKey}`);
     }
     await cached.session.steer(text, images);
   }
@@ -197,27 +244,29 @@ export class PiRuntime {
    * in a `finally` block regardless of outcome.
    */
   async prompt(
-    threadKey: string,
+    scopeInput: RuntimeScopeInput,
     text: string,
     cwd: string,
     callbacks: PiPromptCallbacks = {},
   ): Promise<PiPromptResult> {
-    const execution = this.runPrompt(threadKey, text, cwd, callbacks);
-    this.inflight.set(threadKey, execution);
+    const scope = this.normalizeScope(scopeInput);
+    const scopeKey = getScopeKey(scope);
+    const execution = this.runPrompt(scope, text, cwd, callbacks);
+    this.inflight.set(scopeKey, execution);
     try {
       return await execution;
     } finally {
-      this.inflight.delete(threadKey);
+      this.inflight.delete(scopeKey);
     }
   }
 
   private async runPrompt(
-    threadKey: string,
+    scope: RuntimeScope,
     text: string,
     cwd: string,
     callbacks: PiPromptCallbacks,
   ): Promise<PiPromptResult> {
-    const { session } = await this.getOrCreateSession(threadKey, cwd);
+    const { session } = await this.getOrCreateSession(scope, cwd);
     let output = "";
     let toolOutput = "";
     let assistantError: string | undefined;

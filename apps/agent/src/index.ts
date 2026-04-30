@@ -103,7 +103,11 @@ const cronService = new CronService<AgentCronPayload, AgentCronOwner>({
   async execute(job, nowMs) {
     const workspace = await getWorkspace(job.owner.threadKey, config.workspace);
     const promptText = buildCronPromptText(job, nowMs);
-    const result = await runtime.prompt(job.owner.threadKey, promptText, workspace);
+    const result = await runtime.prompt(
+      { agentId: config.defaultAgent, threadKey: job.owner.threadKey },
+      promptText,
+      workspace,
+    );
 
     if (result.error) {
       return { status: "error", error: result.error };

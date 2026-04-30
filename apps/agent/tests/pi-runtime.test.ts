@@ -22,8 +22,10 @@ const modelRegistryCtor = vi.fn(function ModelRegistryMock() {
   return { kind: "models", registerProvider };
 });
 const settingsManagerCreate = vi.fn(() => ({ kind: "settings" }));
+const fsAccess = vi.fn(async (_path: unknown) => undefined);
 
 vi.mock("node:fs/promises", () => ({
+  access: fsAccess,
   mkdir: vi.fn(async () => undefined),
 }));
 
@@ -54,6 +56,13 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 function createRuntimeConfig() {
   return {
     agents: {
+      coder: {
+        aliases: [],
+        displayName: "Coder",
+        id: "coder",
+        piProfile: "coder-profile",
+        profileRoot: "/mock/coder-agent",
+      },
       default: {
         aliases: [],
         displayName: "shellRaining",
@@ -95,6 +104,70 @@ describe("PiRuntime", () => {
     });
     settingsManagerCreate.mockReturnValue({ kind: "settings" });
     registerProvider.mockReturnValue(undefined);
+    fsAccess.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+  });
+
+  it("scopes Pi sessions by agent id and thread key", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt(
+      { agentId: "default", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+    await runtime.prompt(
+      { agentId: "coder", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+
+    expect(authStorageCreate).toHaveBeenNthCalledWith(1, "/mock/agent/auth.json");
+    expect(authStorageCreate).toHaveBeenNthCalledWith(2, "/mock/coder-agent/auth.json");
+    expect(sessionManagerContinueRecent).toHaveBeenNthCalledWith(
+      1,
+      "/mock/workspace",
+      "/mock/base/sessions/default/telegram__1",
+    );
+    expect(sessionManagerContinueRecent).toHaveBeenNthCalledWith(
+      2,
+      "/mock/workspace",
+      "/mock/base/sessions/coder/telegram__1",
+    );
+  });
+
+  it("rejects unknown agent scopes before creating session directories", async () => {
+    const { mkdir } = await import("node:fs/promises");
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await expect(
+      runtime.prompt({ agentId: "missing", threadKey: "telegram__1" }, "hello", "/mock/workspace"),
+    ).rejects.toThrow("Agent is not configured: missing");
+
+    expect(mkdir).not.toHaveBeenCalled();
+  });
+
+  it("continues legacy default-agent session directories when no scoped directory exists", async () => {
+    fsAccess.mockImplementation(async (path: unknown) => {
+      if (path === "/mock/base/sessions/telegram__1") {
+        return undefined;
+      }
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    });
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt(
+      { agentId: "default", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+
+    expect(sessionManagerContinueRecent).toHaveBeenCalledWith(
+      "/mock/workspace",
+      "/mock/base/sessions/telegram__1",
+    );
   });
 
   it("passes extension factories from builder into the Pi resource loader", async () => {
@@ -180,7 +253,7 @@ describe("PiRuntime", () => {
     expect(sessionManagerContinueRecent).toHaveBeenCalledTimes(1);
     expect(sessionManagerCreate).toHaveBeenCalledWith(
       "/mock/workspace",
-      "/mock/base/sessions/telegram__1",
+      "/mock/base/sessions/default/telegram__1",
     );
   });
 

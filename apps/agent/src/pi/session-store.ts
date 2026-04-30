@@ -21,3 +21,10 @@ export function getChatIdFromThreadKey(threadKey: string): number {
 export function getSessionDirectoryForThread(baseDir: string, threadKey: string): string {
   return join(baseDir, "sessions", threadKey);
 }
+
+export function getSessionDirectoryForScope(
+  baseDir: string,
+  scope: { agentId: string; threadKey: string },
+): string {
+  return join(baseDir, "sessions", scope.agentId, scope.threadKey);
+}
