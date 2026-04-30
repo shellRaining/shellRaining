@@ -178,7 +178,10 @@ describe("CronService", () => {
 
   it("stores condition errors as job failures", async () => {
     const { CronService } = await import("../src/index.js");
-    runCondition.mockResolvedValue({ status: "error", error: "Condition command exited with code 2" });
+    runCondition.mockResolvedValue({
+      status: "error",
+      error: "Condition command exited with code 2",
+    });
     const job = createJob({
       id: "cond-fail",
       condition: { command: "bad-command" },

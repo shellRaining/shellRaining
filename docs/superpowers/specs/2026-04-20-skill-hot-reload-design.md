@@ -32,6 +32,7 @@ Next prompt in session sees updated <available_skills> catalog
 New module: `apps/agent/src/pi/skill-watcher.ts`
 
 Responsibilities:
+
 - Accept a list of skill directory paths to watch
 - Use chokidar to watch for `add`, `unlink`, `change` events on `*.md` and `SKILL.md` files
 - Debounce file events (500ms) to batch rapid changes
@@ -42,6 +43,7 @@ Integration point: `apps/agent/src/pi/runtime.ts` — `PiRuntime` creates a `Ski
 ### Watched Paths
 
 Three directories (if they exist):
+
 1. User-level: `~/Documents/dotfiles/skills/` (from `SHELL_RAINING_SKILLS_DIR`)
 2. Agent-level: `~/.pi/agent/skills/` (from `SHELL_RAINING_AGENT_DIR`)
 3. Project-level: `<cwd>/.claude/skills/`
@@ -51,6 +53,7 @@ Three directories (if they exist):
 After `resourceLoader.reload()` refreshes the skill metadata, the system prompt must be rebuilt. The `AgentSession._rebuildSystemPrompt()` method is private, but calling `session.setActiveToolsByName([...currentTools])` with the same tool list triggers a rebuild as a side effect.
 
 The reload flow:
+
 1. `skillWatcher` fires the debounced callback
 2. Callback calls `resourceLoader.reload()`
 3. Callback reads current active tools via `session.getActiveTools()` (or tracks them separately)
@@ -80,13 +83,13 @@ Remove the shellRaining skill system prompt fragment that duplicates pi-coding-a
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `apps/agent/src/pi/skill-watcher.ts` | New — chokidar-based watcher with debounce |
-| `apps/agent/src/pi/runtime.ts` | Integrate SkillWatcher, remove skills config from appendSystemPromptOverride |
-| `packages/system-prompt/src/fragments/skills.ts` | Delete |
-| `packages/system-prompt/src/build.ts` | Remove skills fragment import and usage |
-| `packages/system-prompt/src/types.ts` (or wherever SystemPromptContext is defined) | Remove `skills` field if no other consumers |
+| File                                                                               | Change                                                                       |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `apps/agent/src/pi/skill-watcher.ts`                                               | New — chokidar-based watcher with debounce                                   |
+| `apps/agent/src/pi/runtime.ts`                                                     | Integrate SkillWatcher, remove skills config from appendSystemPromptOverride |
+| `packages/system-prompt/src/fragments/skills.ts`                                   | Delete                                                                       |
+| `packages/system-prompt/src/build.ts`                                              | Remove skills fragment import and usage                                      |
+| `packages/system-prompt/src/types.ts` (or wherever SystemPromptContext is defined) | Remove `skills` field if no other consumers                                  |
 
 ## Out of Scope
 

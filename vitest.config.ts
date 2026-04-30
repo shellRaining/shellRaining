@@ -11,10 +11,6 @@ export default defineConfig({
   },
   test: {
     exclude: ["**/.worktrees/**", "**/dist/**", "**/node_modules/**"],
-    include: [
-      "tests/**/*.test.ts",
-      "apps/*/tests/**/*.test.ts",
-      "packages/*/tests/**/*.test.ts",
-    ],
+    include: ["tests/**/*.test.ts", "apps/*/tests/**/*.test.ts", "packages/*/tests/**/*.test.ts"],
   },
 });

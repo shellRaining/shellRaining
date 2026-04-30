@@ -28,6 +28,7 @@ Tech Stack: Node.js, TypeScript, Vitest, chokidar, pnpm workspace, Pi Coding Age
 ### Task 1: 清理重复的 shellRaining skills 提示词
 
 Files:
+
 - Modify: `packages/system-prompt/src/build.ts`
 - Modify: `packages/system-prompt/src/types.ts`
 - Modify: `packages/system-prompt/tests/system-prompt.test.ts`
@@ -145,6 +146,7 @@ git commit -m "refactor: remove redundant skills prompt fragment"
 ### Task 2: 为 SkillWatcher 建立独立的可测试边界
 
 Files:
+
 - Modify: `apps/agent/package.json`
 - Create: `apps/agent/src/pi/skill-watcher.ts`
 - Create: `apps/agent/tests/skill-watcher.test.ts`
@@ -360,6 +362,7 @@ git commit -m "feat: add debounced skill watcher"
 ### Task 3: 在 PiRuntime 中接入热更新与系统提示词重建
 
 Files:
+
 - Modify: `apps/agent/src/pi/runtime.ts`
 - Modify: `apps/agent/tests/pi-runtime.test.ts`
 
@@ -551,7 +554,7 @@ import { getSessionDirectoryForThread } from "./session-store.js";
 在 `createSession()` 里创建 session 后立刻注册 watcher：
 
 ```ts
-    await this.ensureSkillWatcher(cwd, resourceLoader, session);
+await this.ensureSkillWatcher(cwd, resourceLoader, session);
 ```
 
 在类末尾新增：
@@ -589,6 +592,7 @@ git commit -m "feat: hot reload skills in pi runtime"
 ### Task 4: 在应用入口接管 watcher 生命周期
 
 Files:
+
 - Modify: `apps/agent/src/index.ts`
 
 - [ ] Step 1: 先补一个最小集成约束
@@ -645,6 +649,7 @@ git commit -m "refactor: dispose runtime on shutdown"
 ### Task 5: 跑完整验证，确认热更新方案闭环
 
 Files:
+
 - Modify: `apps/agent/tests/pi-runtime.test.ts`
 - Modify: `apps/agent/tests/skill-watcher.test.ts`
 - Modify: `packages/system-prompt/tests/system-prompt.test.ts`

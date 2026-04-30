@@ -20,6 +20,7 @@ Tech Stack: TypeScript, Node.js fs/path/os APIs, Vitest, Pi Coding Agent SDK (`S
 ## Task 1: Load shellRaining config file
 
 Files:
+
 - Modify: `apps/agent/src/config.ts`
 - Test: `apps/agent/tests/config.test.ts`
 
@@ -102,11 +103,11 @@ import { existsSync, readFileSync } from "node:fs";
 Extend `Config`:
 
 ```ts
-  pi: {
-    settingsPath: string;
-    authPath: string;
-    modelsPath: string;
-  };
+pi: {
+  settingsPath: string;
+  authPath: string;
+  modelsPath: string;
+}
 ```
 
 Add internal config types and helpers:
@@ -160,7 +161,8 @@ function resolveConfigValue(value: string | undefined): string | undefined {
 }
 
 function loadConfigFile(): ShellRainingConfigFile {
-  const path = process.env.SHELL_RAINING_CONFIG?.trim() || join(homedir(), ".shellRaining", "config.json");
+  const path =
+    process.env.SHELL_RAINING_CONFIG?.trim() || join(homedir(), ".shellRaining", "config.json");
   if (!existsSync(path)) {
     return {};
   }
@@ -183,10 +185,12 @@ Update `loadConfig()` to read file values before env fallbacks, with env overrid
 ```ts
 const fileConfig = loadConfigFile();
 const baseDir = expandHome(
-  firstString(process.env.SHELL_RAINING_BASE_DIR, fileConfig.paths?.baseDir) || join(home, ".shellRaining"),
+  firstString(process.env.SHELL_RAINING_BASE_DIR, fileConfig.paths?.baseDir) ||
+    join(home, ".shellRaining"),
 );
 const agentDir = expandHome(
-  firstString(process.env.SHELL_RAINING_AGENT_DIR, fileConfig.paths?.agentDir) || join(baseDir, "agent"),
+  firstString(process.env.SHELL_RAINING_AGENT_DIR, fileConfig.paths?.agentDir) ||
+    join(baseDir, "agent"),
 );
 ```
 
@@ -215,6 +219,7 @@ Expected: only config loader and config tests changed.
 ## Task 2: Preserve environment variable overrides
 
 Files:
+
 - Modify: `apps/agent/src/config.ts`
 - Test: `apps/agent/tests/config.test.ts`
 
@@ -272,7 +277,7 @@ const allowedUsers = process.env.SHELL_RAINING_ALLOWED_USERS?.trim()
   ? process.env.SHELL_RAINING_ALLOWED_USERS.split(",")
       .map((id) => Number.parseInt(id.trim(), 10))
       .filter((id) => !Number.isNaN(id))
-  : fileConfig.telegram?.allowedUsers ?? [];
+  : (fileConfig.telegram?.allowedUsers ?? []);
 ```
 
 Use the same precedence for Telegram API URL, webhook secret, workspace, agentDir, skillsDir, showThinking, cron, STT, and providerBaseUrl compatibility.
@@ -292,6 +297,7 @@ Expected: env override behavior is covered by tests.
 ## Task 3: Wire Pi-compatible settings/auth/models into PiRuntime
 
 Files:
+
 - Modify: `apps/agent/src/pi/runtime.ts`
 - Test: `apps/agent/tests/pi-runtime.test.ts`
 
@@ -336,14 +342,8 @@ it("uses shellRaining-owned Pi-compatible settings, auth, and models files", asy
   await runtime.prompt("telegram__1", "hello", "/mock/workspace");
 
   expect(authStorageCreate).toHaveBeenCalledWith("/mock/base/agent/auth.json");
-  expect(modelRegistryCtor).toHaveBeenCalledWith(
-    { kind: "auth" },
-    "/mock/base/agent/models.json",
-  );
-  expect(settingsManagerCreate).toHaveBeenCalledWith(
-    "/mock/workspace",
-    "/mock/agent",
-  );
+  expect(modelRegistryCtor).toHaveBeenCalledWith({ kind: "auth" }, "/mock/base/agent/models.json");
+  expect(settingsManagerCreate).toHaveBeenCalledWith("/mock/workspace", "/mock/agent");
   expect(defaultResourceLoader).toHaveBeenCalledWith(
     expect.objectContaining({ settingsManager: { kind: "settings" } }),
   );
@@ -424,6 +424,7 @@ Expected: Pi SDK services are explicit and rooted in shellRaining paths.
 ## Task 4: Keep providerBaseUrl as compatibility only
 
 Files:
+
 - Modify: `apps/agent/src/config.ts`
 - Modify: `apps/agent/src/pi/runtime.ts`
 - Test: `apps/agent/tests/pi-runtime.test.ts`
@@ -491,6 +492,7 @@ Expected: compatibility path remains but is no longer tied to `session.modelRegi
 ## Task 5: Full verification
 
 Files:
+
 - Verify all modified files.
 
 - [ ] Step 1: Run agent tests

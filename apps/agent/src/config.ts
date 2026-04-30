@@ -204,10 +204,10 @@ export function loadConfig(): Config {
     ? process.env.SHELL_RAINING_ALLOWED_USERS.split(",")
         .map((id) => Number.parseInt(id.trim(), 10))
         .filter((id) => !Number.isNaN(id))
-    : fileConfig.telegram?.allowedUsers ?? [];
+    : (fileConfig.telegram?.allowedUsers ?? []);
   const port = process.env.SHELL_RAINING_PORT
     ? Number.parseInt(process.env.SHELL_RAINING_PORT, 10)
-    : firstNumber(fileConfig.server?.port) ?? 3457;
+    : (firstNumber(fileConfig.server?.port) ?? 3457);
 
   return {
     telegramToken: token,
@@ -262,8 +262,10 @@ export function loadConfig(): Config {
       fileConfig.agent?.providerBaseUrl,
     )
       ? trimTrailingSlashes(
-          firstString(process.env.SHELL_RAINING_PROVIDER_BASE_URL, fileConfig.agent?.providerBaseUrl) ??
-            "",
+          firstString(
+            process.env.SHELL_RAINING_PROVIDER_BASE_URL,
+            fileConfig.agent?.providerBaseUrl,
+          ) ?? "",
         )
       : undefined,
     pi: {
