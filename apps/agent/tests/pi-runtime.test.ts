@@ -10,10 +10,12 @@ const sessionGetActiveToolNames = vi.fn(() => ["read", "bash"]);
 const sessionSetActiveToolsByName = vi.fn();
 const sessionManagerContinueRecent = vi.fn(() => ({ mode: "recent" }));
 const sessionManagerCreate = vi.fn(() => ({ mode: "new" }));
-const resourceLoaderReload = vi.fn(async () => undefined);
+const resourceLoaderReloads: ReturnType<typeof vi.fn>[] = [];
 const defaultResourceLoader = vi.fn(function DefaultResourceLoaderMock() {
+  const reload = vi.fn(async () => undefined);
+  resourceLoaderReloads.push(reload);
   return {
-    reload: resourceLoaderReload,
+    reload,
   };
 });
 const registerProvider = vi.fn();
@@ -23,6 +25,9 @@ const modelRegistryCtor = vi.fn(function ModelRegistryMock() {
 });
 const settingsManagerCreate = vi.fn(() => ({ kind: "settings" }));
 const fsAccess = vi.fn(async (_path: unknown) => undefined);
+const watcherClose = vi.fn(async () => undefined);
+const watcherOn = vi.fn();
+const watchedPaths: string[] = [];
 
 vi.mock("node:fs/promises", () => ({
   access: fsAccess,
@@ -50,6 +55,15 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
     continueRecent: sessionManagerContinueRecent,
     create: sessionManagerCreate,
     list: vi.fn(() => []),
+  },
+}));
+
+vi.mock("chokidar", () => ({
+  default: {
+    watch: vi.fn((paths: string | string[]) => {
+      watchedPaths.push(...(Array.isArray(paths) ? paths : [paths]));
+      return { close: watcherClose, on: watcherOn };
+    }),
   },
 }));
 
@@ -95,7 +109,7 @@ describe("PiRuntime", () => {
     sessionNewSession.mockResolvedValue(true);
     sessionManagerContinueRecent.mockReturnValue({ mode: "recent" });
     sessionManagerCreate.mockReturnValue({ mode: "new" });
-    resourceLoaderReload.mockResolvedValue(undefined);
+    resourceLoaderReloads.length = 0;
     sessionGetActiveToolNames.mockReturnValue(["read", "bash"]);
     sessionSetActiveToolsByName.mockReturnValue(undefined);
     authStorageCreate.mockReturnValue({ kind: "auth" });
@@ -105,6 +119,7 @@ describe("PiRuntime", () => {
     settingsManagerCreate.mockReturnValue({ kind: "settings" });
     registerProvider.mockReturnValue(undefined);
     fsAccess.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    watchedPaths.length = 0;
   });
 
   it("scopes Pi sessions by agent id and thread key", async () => {
@@ -184,6 +199,130 @@ describe("PiRuntime", () => {
     expect(defaultResourceLoader).toHaveBeenCalledWith(
       expect.objectContaining({ extensionFactories: [extensionFactory] }),
     );
+  });
+
+  it("reloads active sessions for changed Pi profile resources", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt(
+      { agentId: "default", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+    await runtime.prompt(
+      { agentId: "coder", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+    resourceLoaderReloads.forEach((reload) => reload.mockClear());
+
+    await runtime.reloadProfileResources("default");
+
+    expect(sessionGetActiveToolNames).toHaveBeenCalledBefore(resourceLoaderReloads[0]);
+    expect(resourceLoaderReloads[0]).toHaveBeenCalledTimes(1);
+    expect(resourceLoaderReloads[1]).not.toHaveBeenCalled();
+    expect(sessionSetActiveToolsByName).toHaveBeenCalledTimes(1);
+    expect(sessionSetActiveToolsByName).toHaveBeenCalledWith(["read", "bash"]);
+  });
+
+  it("recreates sessions for changed Pi profile registries on the next prompt", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt(
+      { agentId: "default", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+    await runtime.prompt(
+      { agentId: "coder", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+
+    await runtime.invalidateProfileSessions("default");
+    await runtime.prompt(
+      { agentId: "default", threadKey: "telegram__1" },
+      "again",
+      "/mock/workspace",
+    );
+
+    expect(sessionDispose).toHaveBeenCalledTimes(1);
+    expect(defaultResourceLoader).toHaveBeenCalledTimes(3);
+    expect(authStorageCreate).toHaveBeenNthCalledWith(3, "/mock/agent/auth.json");
+  });
+
+  it("defers profile session invalidation while a prompt is in flight", async () => {
+    let resolvePrompt: (() => void) | undefined;
+    sessionPrompt.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolvePrompt = resolve;
+        }),
+    );
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    const prompt = runtime.prompt(
+      { agentId: "default", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+    await vi.waitFor(() => expect(sessionPrompt).toHaveBeenCalledTimes(1));
+    await runtime.invalidateProfileSessions("default");
+
+    expect(sessionDispose).not.toHaveBeenCalled();
+
+    resolvePrompt?.();
+    await prompt;
+    sessionPrompt.mockResolvedValue(undefined);
+    await runtime.prompt(
+      { agentId: "default", threadKey: "telegram__1" },
+      "again",
+      "/mock/workspace",
+    );
+
+    expect(sessionDispose).toHaveBeenCalledTimes(1);
+    expect(defaultResourceLoader).toHaveBeenCalledTimes(2);
+  });
+
+  it("starts one profile watcher for each used Pi profile", async () => {
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    await runtime.prompt(
+      { agentId: "default", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+    await runtime.prompt(
+      { agentId: "default", threadKey: "telegram__2" },
+      "hello",
+      "/mock/workspace",
+    );
+    await runtime.prompt(
+      { agentId: "coder", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
+
+    expect(watchedPaths).toEqual([
+      "/mock/agent/settings.json",
+      "/mock/agent/models.json",
+      "/mock/agent/auth.json",
+      "/mock/agent/skills",
+      "/mock/agent/extensions",
+      "/mock/agent/prompts",
+      "/mock/agent/themes",
+      "/mock/coder-agent/settings.json",
+      "/mock/coder-agent/models.json",
+      "/mock/coder-agent/auth.json",
+      "/mock/coder-agent/skills",
+      "/mock/coder-agent/extensions",
+      "/mock/coder-agent/prompts",
+      "/mock/coder-agent/themes",
+    ]);
   });
 
   it("uses the default agent profile root for Pi-owned settings, auth, and models files", async () => {
@@ -293,5 +432,6 @@ describe("PiRuntime", () => {
     await runtime.dispose();
 
     expect(sessionDispose).toHaveBeenCalledTimes(1);
+    expect(watcherClose).toHaveBeenCalledTimes(1);
   });
 });

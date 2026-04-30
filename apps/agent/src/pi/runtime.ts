@@ -13,6 +13,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import type { Config } from "../config.js";
 import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
+import { ProfileWatcher } from "./profile-watcher.js";
 import { getSessionDirectoryForScope, getSessionDirectoryForThread } from "./session-store.js";
 
 export interface PiPromptResult {
@@ -43,8 +44,11 @@ interface PiRuntimeOptions {
 
 interface CachedSession {
   cwd: string;
+  resourceLoader: DefaultResourceLoader;
+  scope: RuntimeScope;
   sessionDir: string;
   session: Awaited<ReturnType<typeof createAgentSession>>["session"];
+  stale: boolean;
 }
 
 type RuntimeScopeInput = RuntimeScope | string;
@@ -86,6 +90,7 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 export class PiRuntime {
+  private readonly profileWatchers = new Map<string, ProfileWatcher>();
   private readonly sessions = new Map<string, CachedSession>();
   /** Tracks in-flight prompt executions per runtime scope for mid-session steering. */
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
@@ -101,6 +106,7 @@ export class PiRuntime {
     mode: "continue" | "new",
   ): Promise<CachedSession> {
     const profileRoot = this.getAgentProfileRoot(scope.agentId);
+    this.ensureProfileWatcher(scope.agentId);
     const sessionDir = await this.resolveSessionDir(scope, mode);
     await mkdir(sessionDir, { recursive: true });
     const authStorage = AuthStorage.create(join(profileRoot, "auth.json"));
@@ -138,7 +144,7 @@ export class PiRuntime {
           : SessionManager.continueRecent(cwd, sessionDir),
     });
 
-    const cached = { cwd, session, sessionDir };
+    const cached = { cwd, resourceLoader, scope, session, sessionDir, stale: false };
     this.sessions.set(getScopeKey(scope), cached);
 
     return cached;
@@ -163,6 +169,32 @@ export class PiRuntime {
     return agent.profileRoot;
   }
 
+  private ensureProfileWatcher(agentId: string): void {
+    const agent = this.config.agents[agentId];
+    if (!agent || this.profileWatchers.has(agent.piProfile)) {
+      return;
+    }
+
+    this.profileWatchers.set(
+      agent.piProfile,
+      new ProfileWatcher({
+        debounceMs: 500,
+        onAuthOrModelChange: (piProfile) => this.invalidateProfileSessions(piProfile),
+        onResourceChange: (piProfile) => this.reloadProfileResources(piProfile),
+        piProfile: agent.piProfile,
+        profileRoot: agent.profileRoot,
+      }),
+    );
+  }
+
+  private getAgentIdsForProfile(piProfile: string): Set<string> {
+    return new Set(
+      Object.values(this.config.agents)
+        .filter((agent) => agent.piProfile === piProfile)
+        .map((agent) => agent.id),
+    );
+  }
+
   private normalizeScope(input: RuntimeScopeInput): RuntimeScope {
     if (typeof input === "string") {
       return { agentId: this.config.defaultAgent, threadKey: input };
@@ -173,6 +205,12 @@ export class PiRuntime {
   private async getOrCreateSession(scope: RuntimeScope, cwd: string): Promise<CachedSession> {
     const scopeKey = getScopeKey(scope);
     const existing = this.sessions.get(scopeKey);
+    if (existing?.stale && !this.inflight.has(scopeKey)) {
+      existing.session.dispose();
+      this.sessions.delete(scopeKey);
+      return this.createSession(scope, cwd, "continue");
+    }
+
     if (existing && existing.cwd === cwd) {
       return existing;
     }
@@ -183,6 +221,33 @@ export class PiRuntime {
     }
 
     return this.createSession(scope, cwd, "continue");
+  }
+
+  async reloadProfileResources(piProfile: string): Promise<void> {
+    const agentIds = this.getAgentIdsForProfile(piProfile);
+    for (const cached of this.sessions.values()) {
+      if (!agentIds.has(cached.scope.agentId)) {
+        continue;
+      }
+      const activeToolNames = cached.session.getActiveToolNames();
+      await cached.resourceLoader.reload();
+      cached.session.setActiveToolsByName(activeToolNames);
+    }
+  }
+
+  async invalidateProfileSessions(piProfile: string): Promise<void> {
+    const agentIds = this.getAgentIdsForProfile(piProfile);
+    for (const [scopeKey, cached] of this.sessions) {
+      if (!agentIds.has(cached.scope.agentId)) {
+        continue;
+      }
+      if (this.inflight.has(scopeKey)) {
+        cached.stale = true;
+        continue;
+      }
+      cached.session.dispose();
+      this.sessions.delete(scopeKey);
+    }
   }
 
   async newSession(scopeInput: RuntimeScopeInput, cwd: string): Promise<void> {
@@ -338,5 +403,9 @@ export class PiRuntime {
       session.dispose();
     }
     this.sessions.clear();
+    for (const watcher of this.profileWatchers.values()) {
+      await watcher.dispose();
+    }
+    this.profileWatchers.clear();
   }
 }
