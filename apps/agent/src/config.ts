@@ -234,9 +234,11 @@ export function loadConfig(): Config {
       fileConfig.agent?.showThinking ?? false,
     ),
     cron: {
-      jobsPath:
+      jobsPath: expandHome(
         firstString(process.env.SHELL_RAINING_CRON_JOBS_PATH, fileConfig.cron?.jobsPath) ||
-        join(baseDir, "cron", "jobs.json"),
+          join(baseDir, "cron", "jobs.json"),
+        home,
+      ),
       runTimeoutMs: parseCronNumber(
         process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS,
         firstNumber(fileConfig.cron?.runTimeoutMs) ?? 5 * 60 * 1000,

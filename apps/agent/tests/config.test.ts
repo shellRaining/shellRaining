@@ -63,7 +63,11 @@ describe("config", () => {
           skillsDir: join(tempDir, "skills"),
         },
         agent: { showThinking: true },
-        cron: { runTimeoutMs: 1000, misfireGraceMs: 2000 },
+        cron: {
+          jobsPath: "~/.shellRaining/cron/jobs.json",
+          runTimeoutMs: 1000,
+          misfireGraceMs: 2000,
+        },
         stt: {
           apiKey: "stt-key",
           baseUrl: "https://stt.example.com/",
@@ -87,7 +91,7 @@ describe("config", () => {
     expect(config.agentDir).toBe(join(tempDir, "base", "agent"));
     expect(config.skillsDir).toBe(join(tempDir, "skills"));
     expect(config.showThinking).toBe(true);
-    expect(config.cron.jobsPath).toBe(join(tempDir, "base", "cron", "jobs.json"));
+    expect(config.cron.jobsPath).toBe("/mock/home/.shellRaining/cron/jobs.json");
     expect(config.cron.runTimeoutMs).toBe(1000);
     expect(config.cron.misfireGraceMs).toBe(2000);
     expect(config.stt).toEqual({
