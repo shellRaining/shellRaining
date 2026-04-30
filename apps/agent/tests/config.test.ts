@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -375,6 +375,58 @@ describe("config", () => {
 
     expect(config.telegramToken).toBe("file-token");
     expect(config.port).toBe(3457);
+  });
+
+  it("rejects unknown shellRaining config keys", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        pi: { settingsPath: "settings.json" },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*\/pi/);
+  });
+
+  it("rejects invalid shellRaining config value types", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({ telegram: { botToken: "file-token" }, server: { port: "4567" } }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config.js");
+
+    await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*\/server\/port/);
+  });
+
+  it("provides a JSON Schema for shellRaining-owned config", async () => {
+    const schema = JSON.parse(
+      await readFile(join(import.meta.dirname, "..", "schema", "config.schema.json"), "utf8"),
+    ) as { properties?: Record<string, unknown> };
+
+    expect(schema.properties).toHaveProperty("telegram");
+    expect(schema.properties).toHaveProperty("agents");
+    expect(schema.properties).not.toHaveProperty("pi");
+  });
+
+  it("keeps the JSON Schema file in sync with the runtime TypeBox schema", async () => {
+    const schema = JSON.parse(
+      await readFile(join(import.meta.dirname, "..", "schema", "config.schema.json"), "utf8"),
+    );
+    const { shellRainingConfigFileSchema } = await import("../src/config.js");
+
+    expect(schema).toEqual(JSON.parse(JSON.stringify(shellRainingConfigFileSchema)));
   });
 
   it("loads cron storage and timeout defaults", async () => {

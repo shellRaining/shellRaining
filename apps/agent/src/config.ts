@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { Type, type Static } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import { loadConfig as loadC12Config } from "c12";
 
 /** Application configuration loaded from environment variables (or `.env` file). */
@@ -52,41 +54,80 @@ export interface ResolvedAgentConfig {
   profileRoot: string;
 }
 
-interface ShellRainingConfigFile {
-  server?: {
-    port?: number;
-  };
-  telegram?: {
-    botToken?: string;
-    apiBaseUrl?: string;
-    webhookSecret?: string;
-    allowedUsers?: number[];
-    defaultAgent?: string;
-    showThinking?: boolean;
-  };
-  paths?: {
-    baseDir?: string;
-    workspace?: string;
-  };
-  agents?: Record<
-    string,
-    {
-      displayName?: string;
-      piProfile?: string;
-      aliases?: string[];
-    }
-  >;
-  cron?: {
-    jobsPath?: string;
-    runTimeoutMs?: number;
-    misfireGraceMs?: number;
-  };
-  stt?: {
-    apiKey?: string;
-    baseUrl?: string;
-    model?: string;
-  };
-}
+export const shellRainingConfigFileSchema = Type.Object(
+  {
+    server: Type.Optional(
+      Type.Object(
+        {
+          port: Type.Optional(Type.Number()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    telegram: Type.Optional(
+      Type.Object(
+        {
+          botToken: Type.Optional(Type.String()),
+          apiBaseUrl: Type.Optional(Type.String()),
+          webhookSecret: Type.Optional(Type.String()),
+          allowedUsers: Type.Optional(Type.Array(Type.Number())),
+          defaultAgent: Type.Optional(Type.String()),
+          showThinking: Type.Optional(Type.Boolean()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    paths: Type.Optional(
+      Type.Object(
+        {
+          baseDir: Type.Optional(Type.String()),
+          workspace: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    agents: Type.Optional(
+      Type.Record(
+        Type.String(),
+        Type.Object(
+          {
+            displayName: Type.Optional(Type.String()),
+            piProfile: Type.Optional(Type.String()),
+            aliases: Type.Optional(Type.Array(Type.String())),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    ),
+    cron: Type.Optional(
+      Type.Object(
+        {
+          jobsPath: Type.Optional(Type.String()),
+          runTimeoutMs: Type.Optional(Type.Number()),
+          misfireGraceMs: Type.Optional(Type.Number()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    stt: Type.Optional(
+      Type.Object(
+        {
+          apiKey: Type.Optional(Type.String()),
+          baseUrl: Type.Optional(Type.String()),
+          model: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  {
+    $id: "https://shellraining.local/schema/config.schema.json",
+    additionalProperties: false,
+    title: "shellRaining Config",
+  },
+);
+
+export type ShellRainingConfigFile = Static<typeof shellRainingConfigFileSchema>;
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (!value) {
@@ -275,7 +316,13 @@ async function loadConfigFile(): Promise<ShellRainingConfigFile> {
     rcFile: false,
   });
 
-  return config;
+  const errors = [...Value.Errors(shellRainingConfigFileSchema, config)];
+  if (errors.length > 0) {
+    const details = errors.map((error) => `${error.path || "/"}: ${error.message}`).join("; ");
+    throw new Error(`Invalid shellRaining config file ${configPath}: ${details}`);
+  }
+
+  return config as ShellRainingConfigFile;
 }
 
 function parseCronNumber(value: string | undefined, defaultValue: number): number {

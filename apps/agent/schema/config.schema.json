@@ -1,0 +1,109 @@
+{
+  "$id": "https://shellraining.local/schema/config.schema.json",
+  "title": "shellRaining Config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "number"
+        }
+      }
+    },
+    "telegram": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "botToken": {
+          "type": "string"
+        },
+        "apiBaseUrl": {
+          "type": "string"
+        },
+        "webhookSecret": {
+          "type": "string"
+        },
+        "allowedUsers": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "defaultAgent": {
+          "type": "string"
+        },
+        "showThinking": {
+          "type": "boolean"
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseDir": {
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string"
+        }
+      }
+    },
+    "agents": {
+      "type": "object",
+      "patternProperties": {
+        "^(.*)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "displayName": {
+              "type": "string"
+            },
+            "piProfile": {
+              "type": "string"
+            },
+            "aliases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "cron": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jobsPath": {
+          "type": "string"
+        },
+        "runTimeoutMs": {
+          "type": "number"
+        },
+        "misfireGraceMs": {
+          "type": "number"
+        }
+      }
+    },
+    "stt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "apiKey": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
