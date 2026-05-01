@@ -38,17 +38,31 @@ export function classifyConfigChangePaths(
   };
 
   for (const path of paths) {
-    const key = path.join(".");
-    if (hotConfigPaths.has(key)) {
+    const key = normalizeConfigChangePath(path);
+    if (!key) {
+      classification.unsupported.push(path.join("."));
+    } else if (hotConfigPaths.has(key) && !classification.hot.includes(key)) {
       classification.hot.push(key);
-    } else if (restartRequiredConfigPaths.has(key)) {
+    } else if (
+      restartRequiredConfigPaths.has(key) &&
+      !classification.restartRequired.includes(key)
+    ) {
       classification.restartRequired.push(key);
-    } else {
-      classification.unsupported.push(key);
     }
   }
 
   return classification;
+}
+
+function normalizeConfigChangePath(path: readonly string[]): string | undefined {
+  for (let length = path.length; length > 0; length -= 1) {
+    const key = path.slice(0, length).join(".");
+    if (hotConfigPaths.has(key) || restartRequiredConfigPaths.has(key)) {
+      return key;
+    }
+  }
+
+  return undefined;
 }
 
 export function buildEffectiveConfig(

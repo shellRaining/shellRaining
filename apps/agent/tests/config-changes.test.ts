@@ -97,6 +97,25 @@ describe("config changes", () => {
     });
   });
 
+  it("normalizes deep diff paths to supported config boundaries without duplicates", () => {
+    expect(
+      classifyConfigChangePaths([
+        ["telegram", "allowedUsers", "0"],
+        ["telegram", "allowedUsers", "1"],
+        ["telegram", "showThinking"],
+        ["stt", "apiKey"],
+        ["agents", "default", "displayName"],
+        ["agents", "default", "aliases", "0"],
+        ["cron", "jobsPath", "value"],
+        ["telegram", "parseMode", "nested"],
+      ]),
+    ).toEqual({
+      hot: ["telegram.allowedUsers", "telegram.showThinking", "stt.apiKey"],
+      restartRequired: ["agents", "cron.jobsPath"],
+      unsupported: ["telegram.parseMode.nested"],
+    });
+  });
+
   it("builds effective config by applying only hot changes", () => {
     const previous = createConfig();
     const next = createConfig();
