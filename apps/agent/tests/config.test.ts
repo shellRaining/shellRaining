@@ -29,6 +29,15 @@ describe("config", () => {
     await expect(loadConfig()).rejects.toThrow("TELEGRAM_BOT_TOKEN is required");
   });
 
+  it("exposes the shared loader resolver for already loaded config files", async () => {
+    const { resolveLoadedConfig } = await import("../src/config/loader.js");
+
+    const config = resolveLoadedConfig({ telegram: { botToken: "file-token" } });
+
+    expect(config.telegram.botToken).toBe("file-token");
+    expect(config.paths.baseDir).toBe("/mock/home/.shellRaining");
+  });
+
   it("loads dotenv from the default config directory without requiring config.json", async () => {
     const tempHome = await mkdtemp(join(tmpdir(), "shellraining-home-"));
     const configDir = join(tempHome, ".shellRaining");
