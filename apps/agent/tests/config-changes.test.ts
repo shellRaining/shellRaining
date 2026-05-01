@@ -1,0 +1,141 @@
+import { describe, expect, it } from "vitest";
+
+import type { Config } from "../src/config.js";
+import { buildEffectiveConfig, classifyConfigChangePaths } from "../src/config.js";
+
+function createConfig(): Config {
+  return {
+    agents: {
+      default: {
+        aliases: [],
+        displayName: "shellRaining",
+        id: "default",
+        piProfile: "default",
+        profileRoot: "/base/pi-profiles/default",
+      },
+    },
+    cron: { jobsPath: "/base/cron/jobs.json", misfireGraceMs: 300000, runTimeoutMs: 300000 },
+    paths: { baseDir: "/base", workspace: "/workspace" },
+    server: { port: 3457 },
+    stt: {},
+    telegram: {
+      allowedUsers: [1],
+      botToken: "token",
+      defaultAgent: "default",
+      showThinking: false,
+    },
+  };
+}
+
+describe("config changes", () => {
+  it("classifies first-phase hot config paths", () => {
+    expect(
+      classifyConfigChangePaths([
+        ["telegram", "allowedUsers"],
+        ["telegram", "showThinking"],
+        ["stt", "apiKey"],
+        ["stt", "baseUrl"],
+        ["stt", "model"],
+      ]),
+    ).toEqual({
+      hot: [
+        "telegram.allowedUsers",
+        "telegram.showThinking",
+        "stt.apiKey",
+        "stt.baseUrl",
+        "stt.model",
+      ],
+      restartRequired: [],
+      unsupported: [],
+    });
+  });
+
+  it("classifies restart-required config paths", () => {
+    expect(
+      classifyConfigChangePaths([
+        ["server", "port"],
+        ["telegram", "botToken"],
+        ["telegram", "apiBaseUrl"],
+        ["telegram", "webhookSecret"],
+        ["telegram", "defaultAgent"],
+        ["paths", "baseDir"],
+        ["paths", "workspace"],
+        ["agents"],
+        ["cron", "jobsPath"],
+        ["cron", "runTimeoutMs"],
+        ["cron", "misfireGraceMs"],
+      ]),
+    ).toEqual({
+      hot: [],
+      restartRequired: [
+        "server.port",
+        "telegram.botToken",
+        "telegram.apiBaseUrl",
+        "telegram.webhookSecret",
+        "telegram.defaultAgent",
+        "paths.baseDir",
+        "paths.workspace",
+        "agents",
+        "cron.jobsPath",
+        "cron.runTimeoutMs",
+        "cron.misfireGraceMs",
+      ],
+      unsupported: [],
+    });
+  });
+
+  it("classifies unknown config paths as unsupported", () => {
+    expect(
+      classifyConfigChangePaths([
+        ["stt", "enabled"],
+        ["telegram", "parseMode"],
+      ]),
+    ).toEqual({
+      hot: [],
+      restartRequired: [],
+      unsupported: ["stt.enabled", "telegram.parseMode"],
+    });
+  });
+
+  it("builds effective config by applying only hot changes", () => {
+    const previous = createConfig();
+    const next = createConfig();
+    next.telegram.allowedUsers = [2, 3];
+    next.telegram.showThinking = true;
+    next.telegram.botToken = "next-token";
+    next.server.port = 4567;
+    next.paths.baseDir = "/next-base";
+    next.stt = {
+      apiKey: "next-api-key",
+      baseUrl: "https://stt.example.com",
+      model: "next-model",
+    };
+
+    const effective = buildEffectiveConfig(
+      previous,
+      next,
+      classifyConfigChangePaths([
+        ["telegram", "allowedUsers"],
+        ["telegram", "showThinking"],
+        ["telegram", "botToken"],
+        ["server", "port"],
+        ["paths", "baseDir"],
+        ["stt", "apiKey"],
+        ["stt", "baseUrl"],
+        ["stt", "model"],
+      ]),
+    );
+
+    expect(effective.telegram.allowedUsers).toEqual([2, 3]);
+    expect(effective.telegram.allowedUsers).not.toBe(next.telegram.allowedUsers);
+    expect(effective.telegram.showThinking).toBe(true);
+    expect(effective.stt).toEqual({
+      apiKey: "next-api-key",
+      baseUrl: "https://stt.example.com",
+      model: "next-model",
+    });
+    expect(effective.telegram.botToken).toBe("token");
+    expect(effective.server.port).toBe(3457);
+    expect(effective.paths.baseDir).toBe("/base");
+  });
+});
