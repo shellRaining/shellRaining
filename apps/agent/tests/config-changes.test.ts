@@ -171,11 +171,7 @@ describe("config changes", () => {
       displayName: "Next Agent",
     };
 
-    const effective = buildEffectiveConfig(
-      previous,
-      next,
-      classifyConfigChangePaths([["agents"]]),
-    );
+    const effective = buildEffectiveConfig(previous, next, classifyConfigChangePaths([["agents"]]));
 
     expect(effective.agents).toEqual(previous.agents);
     expect(effective.agents.default).not.toBe(previous.agents.default);

@@ -65,7 +65,10 @@ export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
 
   const home = homedir();
   const baseDir = expandHome(fileConfig.paths?.baseDir ?? join(home, ".shellRaining"), home);
-  const workspace = expandHome(fileConfig.paths?.workspace ?? join(home, "shellRaining-workspace"), home);
+  const workspace = expandHome(
+    fileConfig.paths?.workspace ?? join(home, "shellRaining-workspace"),
+    home,
+  );
   const agents = resolveAgents(fileConfig.agents, baseDir);
   const defaultAgent = resolveDefaultAgent(fileConfig.telegram?.defaultAgent, agents);
   const port = fileConfig.server?.port ?? 3457;
@@ -115,6 +118,8 @@ export async function loadShellRainingConfigFile(): Promise<ShellRainingConfigFi
     throw new Error(`shellRaining config file not found: ${configPath.path}`);
   }
 
-  const { config } = await loadC12Config<ShellRainingConfigFile>(createC12ConfigOptions(configPath));
+  const { config } = await loadC12Config<ShellRainingConfigFile>(
+    createC12ConfigOptions(configPath),
+  );
   return validateConfigFile(config, configPath.path);
 }

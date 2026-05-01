@@ -1,6 +1,10 @@
 import { watchConfig } from "c12";
 import { buildEffectiveConfig, classifyConfigChangePaths } from "./changes.js";
-import { createC12ConfigOptions, loadShellRainingConfigFile, resolveLoadedConfig } from "./loader.js";
+import {
+  createC12ConfigOptions,
+  loadShellRainingConfigFile,
+  resolveLoadedConfig,
+} from "./loader.js";
 import type { Config, ShellRainingConfigFile } from "./schema.js";
 
 type ConfigListener = (config: Config) => void | Promise<void>;
