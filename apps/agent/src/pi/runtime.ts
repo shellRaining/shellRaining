@@ -151,9 +151,12 @@ export class PiRuntime {
   }
 
   private async resolveSessionDir(scope: RuntimeScope, mode: "continue" | "new"): Promise<string> {
-    const scopedSessionDir = getSessionDirectoryForScope(this.config.baseDir, scope);
-    if (mode === "continue" && scope.agentId === this.config.defaultAgent) {
-      const legacySessionDir = getSessionDirectoryForThread(this.config.baseDir, scope.threadKey);
+    const scopedSessionDir = getSessionDirectoryForScope(this.config.paths.baseDir, scope);
+    if (mode === "continue" && scope.agentId === this.config.telegram.defaultAgent) {
+      const legacySessionDir = getSessionDirectoryForThread(
+        this.config.paths.baseDir,
+        scope.threadKey,
+      );
       if (!(await pathExists(scopedSessionDir)) && (await pathExists(legacySessionDir))) {
         return legacySessionDir;
       }
@@ -197,7 +200,7 @@ export class PiRuntime {
 
   private normalizeScope(input: RuntimeScopeInput): RuntimeScope {
     if (typeof input === "string") {
-      return { agentId: this.config.defaultAgent, threadKey: input };
+      return { agentId: this.config.telegram.defaultAgent, threadKey: input };
     }
     return input;
   }
@@ -264,7 +267,7 @@ export class PiRuntime {
 
   async listSessions(scopeInput: RuntimeScopeInput, cwd: string): Promise<SessionInfo[]> {
     const scope = this.normalizeScope(scopeInput);
-    const sessionDir = getSessionDirectoryForScope(this.config.baseDir, scope);
+    const sessionDir = getSessionDirectoryForScope(this.config.paths.baseDir, scope);
     await mkdir(sessionDir, { recursive: true });
     return SessionManager.list(cwd, sessionDir);
   }
@@ -346,7 +349,10 @@ export class PiRuntime {
         if (event.assistantMessageEvent.type === "text_delta") {
           output += event.assistantMessageEvent.delta;
         }
-        if (this.config.showThinking && event.assistantMessageEvent.type === "thinking_delta") {
+        if (
+          this.config.telegram.showThinking &&
+          event.assistantMessageEvent.type === "thinking_delta"
+        ) {
           output += event.assistantMessageEvent.delta;
         }
       }

@@ -1,488 +1,106 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { loadConfig as loadC12Config } from "c12";
+import { resolveAgents, resolveDefaultAgent } from "./config/agents.js";
+import { buildEnvOverrides } from "./config/env.js";
+import { mergeConfigLayers } from "./config/merge.js";
+import { expandHome, trimTrailingSlashes } from "./config/path.js";
+import {
+  shellRainingConfigDefaults,
+  shellRainingConfigFileSchema,
+  type Config,
+  type ShellRainingConfigFile,
+} from "./config/schema.js";
+import { resolveConfigValue } from "./config/values.js";
 
-/** Application configuration loaded from environment variables (or `.env` file). */
-export interface Config {
-  /** Telegram Bot API token. **Required.** */
-  telegramToken: string;
-  /** Custom Telegram Bot API base URL (e.g. for a local Bot API server). */
-  telegramApiBaseUrl?: string;
-  /** Secret for verifying incoming webhook requests. */
-  telegramWebhookSecret?: string;
-  /** HTTP server listen port. @defaultValue 3457 */
-  port: number;
-  /** Root directory for persistent shellRaining data (sessions, cron store, etc.). */
-  baseDir: string;
-  /** Directory where Pi agent workspaces are created (per-thread subdirectories). */
-  workspace: string;
-  /** Default Telegram-visible agent id. */
-  defaultAgent: string;
-  /** Telegram-visible agents mapped to derived Pi profile roots. */
-  agents: Record<string, ResolvedAgentConfig>;
-  /** Telegram user IDs allowed to interact with the bot. Empty = all users blocked. */
-  allowedUsers: number[];
-  /** Whether to include the agent's thinking output in Telegram replies. @defaultValue false */
-  showThinking: boolean;
-  cron: {
-    /** File path for persisting cron jobs to disk. */
-    jobsPath: string;
-    /** Maximum wall-clock time (ms) for a single cron prompt execution. @defaultValue 300000 (5 min) */
-    runTimeoutMs: number;
-    /** If a job missed its scheduled time by less than this window (ms), run it anyway. @defaultValue 300000 (5 min) */
-    misfireGraceMs: number;
-  };
-  /** Speech-to-text (Whisper-compatible) configuration for transcribing voice messages. */
-  stt: {
-    /** API key for the STT service. */
-    apiKey?: string;
-    /** Base URL of the Whisper-compatible STT endpoint. */
-    baseUrl?: string;
-    /** Model name to request from the STT service. */
-    model?: string;
-  };
-}
-
-export interface ResolvedAgentConfig {
-  id: string;
-  aliases: string[];
-  displayName: string;
-  piProfile: string;
-  profileRoot: string;
-}
-
-export const shellRainingConfigFileSchema = Type.Object(
-  {
-    server: Type.Optional(
-      Type.Object(
-        {
-          port: Type.Optional(Type.Number()),
-        },
-        { additionalProperties: false },
-      ),
-    ),
-    telegram: Type.Optional(
-      Type.Object(
-        {
-          botToken: Type.Optional(Type.String()),
-          apiBaseUrl: Type.Optional(Type.String()),
-          webhookSecret: Type.Optional(Type.String()),
-          allowedUsers: Type.Optional(Type.Array(Type.Number())),
-          defaultAgent: Type.Optional(Type.String()),
-          showThinking: Type.Optional(Type.Boolean()),
-        },
-        { additionalProperties: false },
-      ),
-    ),
-    paths: Type.Optional(
-      Type.Object(
-        {
-          baseDir: Type.Optional(Type.String()),
-          workspace: Type.Optional(Type.String()),
-        },
-        { additionalProperties: false },
-      ),
-    ),
-    agents: Type.Optional(
-      Type.Record(
-        Type.String(),
-        Type.Object(
-          {
-            displayName: Type.Optional(Type.String()),
-            piProfile: Type.Optional(Type.String()),
-            aliases: Type.Optional(Type.Array(Type.String())),
-          },
-          { additionalProperties: false },
-        ),
-      ),
-    ),
-    cron: Type.Optional(
-      Type.Object(
-        {
-          jobsPath: Type.Optional(Type.String()),
-          runTimeoutMs: Type.Optional(Type.Number()),
-          misfireGraceMs: Type.Optional(Type.Number()),
-        },
-        { additionalProperties: false },
-      ),
-    ),
-    stt: Type.Optional(
-      Type.Object(
-        {
-          apiKey: Type.Optional(Type.String()),
-          baseUrl: Type.Optional(Type.String()),
-          model: Type.Optional(Type.String()),
-        },
-        { additionalProperties: false },
-      ),
-    ),
-  },
-  {
-    $id: "https://shellraining.local/schema/config.schema.json",
-    additionalProperties: false,
-    title: "shellRaining Config",
-  },
-);
-
-export type ShellRainingConfigFile = Static<typeof shellRainingConfigFileSchema>;
-
-function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
-  if (!value) {
-    return defaultValue;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "true") {
-    return true;
-  }
-  if (normalized === "false") {
-    return false;
-  }
-  return defaultValue;
-}
-
-function trimTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
-    end--;
-  }
-  return value.slice(0, end);
-}
-
-function expandHome(path: string, home = homedir()): string {
-  if (path === "~") {
-    return home;
-  }
-  if (path.startsWith("~/")) {
-    return join(home, path.slice(2));
-  }
-  return path;
-}
-
-function resolveConfigValue(value: string | undefined): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  if (trimmed.startsWith("env:")) {
-    return process.env[trimmed.slice("env:".length)]?.trim() || undefined;
-  }
-
-  return trimmed;
-}
-
-function firstString(...values: Array<string | undefined>): string | undefined {
-  for (const value of values) {
-    const resolved = resolveConfigValue(value);
-    if (resolved) {
-      return resolved;
-    }
-  }
-  return undefined;
-}
-
-function firstNumber(...values: Array<number | undefined>): number | undefined {
-  for (const value of values) {
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value;
-    }
-  }
-  return undefined;
-}
-
-function isSafeRegistryId(value: string): boolean {
-  return /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value);
-}
-
-function assertSafeAgentId(agentId: string): void {
-  if (!isSafeRegistryId(agentId)) {
-    throw new Error(`Invalid agent id: ${agentId}`);
-  }
-}
-
-function assertSafePiProfileId(profileId: string): void {
-  if (!isSafeRegistryId(profileId)) {
-    throw new Error(`Invalid Pi profile id: ${profileId}`);
-  }
-}
-
-function normalizeAliases(aliases: string[] | undefined): string[] {
-  const seen = new Set<string>();
-  const normalized: string[] = [];
-  for (const alias of aliases ?? []) {
-    const trimmed = alias.trim();
-    if (!trimmed) {
-      continue;
-    }
-    if (!isSafeRegistryId(trimmed)) {
-      throw new Error(`Invalid agent alias: ${trimmed}`);
-    }
-    if (!seen.has(trimmed)) {
-      seen.add(trimmed);
-      normalized.push(trimmed);
-    }
-  }
-  return normalized;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function warnLegacyConfigField(configPath: string, fieldPath: string, message: string): void {
-  console.warn(
-    `Deprecated shellRaining config field ${fieldPath} in ${configPath} is ignored. ${message}`,
-  );
-}
-
-function normalizeLegacyConfig(config: unknown, configPath: string): unknown {
-  if (!isRecord(config)) {
-    return config;
-  }
-
-  const normalized: Record<string, unknown> = { ...config };
-  const paths = isRecord(normalized.paths) ? { ...normalized.paths } : undefined;
-  if (paths && "agentDir" in paths) {
-    warnLegacyConfigField(
-      configPath,
-      "paths.agentDir",
-      "Move Pi profile files to the active profile root under paths.baseDir/pi-profiles/<profile-id>.",
-    );
-    delete paths.agentDir;
-  }
-  if (paths && "skillsDir" in paths) {
-    warnLegacyConfigField(
-      configPath,
-      "paths.skillsDir",
-      "Move this value to the active Pi profile settings.json as the Pi settings field skills.",
-    );
-    delete paths.skillsDir;
-  }
-  if (paths) {
-    normalized.paths = paths;
-  }
-
-  if (isRecord(normalized.agent)) {
-    const legacyAgent = { ...normalized.agent };
-    if (typeof legacyAgent.showThinking === "boolean") {
-      const telegram = isRecord(normalized.telegram) ? { ...normalized.telegram } : {};
-      if (telegram.showThinking === undefined) {
-        telegram.showThinking = legacyAgent.showThinking;
-        console.warn(
-          `Deprecated shellRaining config field agent.showThinking in ${configPath} was mapped to telegram.showThinking.`,
-        );
-      } else {
-        console.warn(
-          `Deprecated shellRaining config field agent.showThinking in ${configPath} is ignored because telegram.showThinking is already configured.`,
-        );
-      }
-      normalized.telegram = telegram;
-      delete legacyAgent.showThinking;
-    }
-    if ("providerBaseUrl" in legacyAgent) {
-      warnLegacyConfigField(
-        configPath,
-        "agent.providerBaseUrl",
-        "Move provider definitions to the active Pi profile models.json.",
-      );
-      delete legacyAgent.providerBaseUrl;
-    }
-    if (Object.keys(legacyAgent).length === 0) {
-      delete normalized.agent;
-    } else {
-      normalized.agent = legacyAgent;
-    }
-  }
-
-  return normalized;
-}
-
-function resolveAgents(
-  agents: ShellRainingConfigFile["agents"],
-  baseDir: string,
-): Record<string, ResolvedAgentConfig> {
-  const entries = agents && Object.keys(agents).length > 0 ? agents : undefined;
-  if (!entries) {
-    return {
-      default: {
-        aliases: [],
-        displayName: "shellRaining",
-        id: "default",
-        piProfile: "default",
-        profileRoot: join(baseDir, "pi-profiles", "default"),
-      },
-    };
-  }
-
-  const resolved: Record<string, ResolvedAgentConfig> = {};
-  const claimedIds = new Set<string>();
-  for (const agentId of Object.keys(entries).sort()) {
-    assertSafeAgentId(agentId);
-    if (claimedIds.has(agentId)) {
-      throw new Error(`Duplicate agent alias or id: ${agentId}`);
-    }
-    claimedIds.add(agentId);
-  }
-
-  for (const agentId of Object.keys(entries).sort()) {
-    const agent = entries[agentId];
-    const piProfile = agent?.piProfile?.trim() || agentId;
-    assertSafePiProfileId(piProfile);
-    const aliases = normalizeAliases(agent?.aliases);
-    for (const alias of aliases) {
-      if (claimedIds.has(alias)) {
-        throw new Error(`Duplicate agent alias or id: ${alias}`);
-      }
-      claimedIds.add(alias);
-    }
-    resolved[agentId] = {
-      aliases,
-      displayName: agent?.displayName?.trim() || agentId,
-      id: agentId,
-      piProfile,
-      profileRoot: join(baseDir, "pi-profiles", piProfile),
-    };
-  }
-
-  return resolved;
-}
-
-function resolveDefaultAgent(
-  configuredDefaultAgent: string | undefined,
-  agents: Record<string, ResolvedAgentConfig>,
-): string {
-  const configured = configuredDefaultAgent?.trim();
-  if (configured && agents[configured]) {
-    return configured;
-  }
-  if (configured) {
-    throw new Error(`Default agent is not configured: ${configured}`);
-  }
-  return Object.keys(agents).sort()[0] ?? "default";
-}
+export type { Config, ResolvedAgentConfig, ShellRainingConfigFile } from "./config/schema.js";
+export { shellRainingConfigFileSchema } from "./config/schema.js";
 
 async function loadConfigFile(): Promise<ShellRainingConfigFile> {
+  const configuredConfigPath = process.env.SHELL_RAINING_CONFIG?.trim();
   const configPath = expandHome(
-    process.env.SHELL_RAINING_CONFIG?.trim() || join(homedir(), ".shellRaining", "config.json"),
+    configuredConfigPath || join(homedir(), ".shellRaining", "config.json"),
   );
-  if (!existsSync(configPath)) {
-    return {};
+  if (configuredConfigPath && !existsSync(configPath)) {
+    throw new Error(`shellRaining config file not found: ${configPath}`);
   }
 
   const { config } = await loadC12Config<ShellRainingConfigFile>({
     configFile: configPath,
-    configFileRequired: true,
+    configFileRequired: Boolean(configuredConfigPath),
     cwd: dirname(configPath),
-    dotenv: false,
+    defaults: shellRainingConfigDefaults,
+    dotenv: {
+      fileName: ".env",
+    },
     envName: false,
     globalRc: false,
+    merger: mergeConfigLayers,
+    // Keep this lazy so C12 loads .env before we map process.env into typed overrides.
+    overrides: () => buildEnvOverrides(),
     packageJson: false,
     rcFile: false,
   });
 
-  const normalizedConfig = normalizeLegacyConfig(config, configPath);
-  const errors = [...Value.Errors(shellRainingConfigFileSchema, normalizedConfig)];
+  const errors = [...Value.Errors(shellRainingConfigFileSchema, config)];
   if (errors.length > 0) {
     const details = errors.map((error) => `${error.path || "/"}: ${error.message}`).join("; ");
     throw new Error(`Invalid shellRaining config file ${configPath}: ${details}`);
   }
 
-  return normalizedConfig as ShellRainingConfigFile;
-}
-
-function parseCronNumber(value: string | undefined, defaultValue: number): number {
-  if (!value) {
-    return defaultValue;
-  }
-
-  const parsed = Number.parseInt(value.trim(), 10);
-  return Number.isNaN(parsed) ? defaultValue : parsed;
+  return config;
 }
 
 export async function loadConfig(): Promise<Config> {
   const fileConfig = await loadConfigFile();
-  const token = firstString(process.env.TELEGRAM_BOT_TOKEN, fileConfig.telegram?.botToken);
+  const token = resolveConfigValue(fileConfig.telegram?.botToken);
   if (!token) {
     throw new Error("TELEGRAM_BOT_TOKEN is required. Set it in .env file.");
   }
 
   const home = homedir();
-  const baseDir = expandHome(
-    firstString(process.env.SHELL_RAINING_BASE_DIR, fileConfig.paths?.baseDir) ||
-      join(home, ".shellRaining"),
-    home,
-  );
+  const baseDir = expandHome(fileConfig.paths?.baseDir ?? join(home, ".shellRaining"), home);
   const workspace = expandHome(
-    firstString(process.env.SHELL_RAINING_WORKSPACE, fileConfig.paths?.workspace) ||
-      join(home, "shellRaining-workspace"),
+    fileConfig.paths?.workspace ?? join(home, "shellRaining-workspace"),
     home,
   );
   const agents = resolveAgents(fileConfig.agents, baseDir);
   const defaultAgent = resolveDefaultAgent(fileConfig.telegram?.defaultAgent, agents);
-  const allowedUsers = process.env.SHELL_RAINING_ALLOWED_USERS?.trim()
-    ? process.env.SHELL_RAINING_ALLOWED_USERS.split(",")
-        .map((id) => Number.parseInt(id.trim(), 10))
-        .filter((id) => !Number.isNaN(id))
-    : (fileConfig.telegram?.allowedUsers ?? []);
-  const port = process.env.SHELL_RAINING_PORT
-    ? Number.parseInt(process.env.SHELL_RAINING_PORT, 10)
-    : (firstNumber(fileConfig.server?.port) ?? 3457);
+  const port = fileConfig.server?.port ?? 3457;
 
   return {
-    telegramToken: token,
-    telegramApiBaseUrl: firstString(
-      process.env.TELEGRAM_API_BASE_URL,
-      fileConfig.telegram?.apiBaseUrl,
-    )
-      ? trimTrailingSlashes(
-          firstString(process.env.TELEGRAM_API_BASE_URL, fileConfig.telegram?.apiBaseUrl) ?? "",
-        )
-      : undefined,
-    telegramWebhookSecret: firstString(
-      process.env.TELEGRAM_WEBHOOK_SECRET,
-      fileConfig.telegram?.webhookSecret,
-    ),
-    port,
-    baseDir,
-    workspace,
-    defaultAgent,
+    server: {
+      port,
+    },
+    telegram: {
+      botToken: token,
+      apiBaseUrl: fileConfig.telegram?.apiBaseUrl
+        ? trimTrailingSlashes(fileConfig.telegram.apiBaseUrl)
+        : undefined,
+      webhookSecret: fileConfig.telegram?.webhookSecret,
+      allowedUsers: fileConfig.telegram?.allowedUsers ?? [],
+      defaultAgent,
+      showThinking: fileConfig.telegram?.showThinking ?? false,
+    },
+    paths: {
+      baseDir,
+      workspace,
+    },
     agents,
-    allowedUsers,
-    showThinking: parseBoolean(
-      process.env.SHELL_RAINING_SHOW_THINKING,
-      fileConfig.telegram?.showThinking ?? false,
-    ),
     cron: {
       jobsPath: expandHome(
-        firstString(process.env.SHELL_RAINING_CRON_JOBS_PATH, fileConfig.cron?.jobsPath) ||
-          join(baseDir, "cron", "jobs.json"),
+        resolveConfigValue(fileConfig.cron?.jobsPath) || join(baseDir, "cron", "jobs.json"),
         home,
       ),
-      runTimeoutMs: parseCronNumber(
-        process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS,
-        firstNumber(fileConfig.cron?.runTimeoutMs) ?? 5 * 60 * 1000,
-      ),
-      misfireGraceMs: parseCronNumber(
-        process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS,
-        firstNumber(fileConfig.cron?.misfireGraceMs) ?? 5 * 60 * 1000,
-      ),
+      runTimeoutMs: fileConfig.cron?.runTimeoutMs ?? 5 * 60 * 1000,
+      misfireGraceMs: fileConfig.cron?.misfireGraceMs ?? 5 * 60 * 1000,
     },
     stt: {
-      apiKey: firstString(process.env.SHELL_RAINING_STT_API_KEY, fileConfig.stt?.apiKey),
-      baseUrl: firstString(process.env.SHELL_RAINING_STT_BASE_URL, fileConfig.stt?.baseUrl)
-        ? trimTrailingSlashes(
-            firstString(process.env.SHELL_RAINING_STT_BASE_URL, fileConfig.stt?.baseUrl) ?? "",
-          )
-        : undefined,
-      model: firstString(process.env.SHELL_RAINING_STT_MODEL, fileConfig.stt?.model),
+      apiKey: fileConfig.stt?.apiKey,
+      baseUrl: fileConfig.stt?.baseUrl ? trimTrailingSlashes(fileConfig.stt.baseUrl) : undefined,
+      model: fileConfig.stt?.model,
     },
   };
 }

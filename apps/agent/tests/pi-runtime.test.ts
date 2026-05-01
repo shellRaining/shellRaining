@@ -85,19 +85,25 @@ function createRuntimeConfig() {
         profileRoot: "/mock/agent",
       },
     },
-    allowedUsers: [],
-    baseDir: "/mock/base",
     cron: {
       jobsPath: "/mock/base/cron/jobs.json",
       misfireGraceMs: 5 * 60 * 1000,
       runTimeoutMs: 5 * 60 * 1000,
     },
-    defaultAgent: "default",
-    port: 1234,
-    showThinking: false,
+    paths: {
+      baseDir: "/mock/base",
+      workspace: "/mock/workspace",
+    },
+    server: {
+      port: 1234,
+    },
     stt: {},
-    telegramToken: "token",
-    workspace: "/mock/workspace",
+    telegram: {
+      allowedUsers: [],
+      botToken: "token",
+      defaultAgent: "default",
+      showThinking: false,
+    },
   };
 }
 

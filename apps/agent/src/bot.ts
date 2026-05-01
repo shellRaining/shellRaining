@@ -25,7 +25,7 @@ function getDefaultRuntimeScope(
   config: Config,
   threadKey: string,
 ): { agentId: string; threadKey: string } {
-  return { agentId: config.defaultAgent, threadKey };
+  return { agentId: config.telegram.defaultAgent, threadKey };
 }
 
 /** Strips the `@botname` suffix that Telegram adds in group mentions (e.g. `/start@mybot` → `/start`). */
@@ -144,7 +144,7 @@ async function handleCommand(
 
   const threadKey = getThreadKeyFromId(thread.id);
   const scope = getDefaultRuntimeScope(config, threadKey);
-  const currentWorkspace = await getWorkspace(threadKey, config.workspace);
+  const currentWorkspace = await getWorkspace(threadKey, config.paths.workspace);
 
   switch (parsed.command) {
     case "start":
@@ -170,12 +170,16 @@ async function handleCommand(
       await thread.post(formatPath(currentWorkspace));
       return true;
     case "home": {
-      const nextWorkspace = await setWorkspace(threadKey, "~", config.workspace);
+      const nextWorkspace = await setWorkspace(threadKey, "~", config.paths.workspace);
       await thread.post(formatPath(nextWorkspace));
       return true;
     }
     case "cd": {
-      const nextWorkspace = await setWorkspace(threadKey, parsed.args || "~", config.workspace);
+      const nextWorkspace = await setWorkspace(
+        threadKey,
+        parsed.args || "~",
+        config.paths.workspace,
+      );
       await thread.post(formatPath(nextWorkspace));
       return true;
     }
@@ -220,9 +224,9 @@ async function handleCommand(
       return true;
     }
     case "status":
-      const agent = config.agents[config.defaultAgent];
+      const agent = config.agents[config.telegram.defaultAgent];
       if (!agent) {
-        throw new Error(`Default agent is not configured: ${config.defaultAgent}`);
+        throw new Error(`Default agent is not configured: ${config.telegram.defaultAgent}`);
       }
       await thread.post(
         formatTelegramStatusMessage({
@@ -230,7 +234,7 @@ async function handleCommand(
           agentId: agent.id,
           piProfile: agent.piProfile,
           profileRoot: agent.profileRoot,
-          telegramApiBaseUrl: config.telegramApiBaseUrl,
+          telegramApiBaseUrl: config.telegram.apiBaseUrl,
           threadId: thread.id,
           workspace: currentWorkspace,
         }),
@@ -263,7 +267,7 @@ async function handlePrompt(
   }
 
   const normalized = await normalizeTelegramInput({
-    baseDir: config.baseDir,
+    baseDir: config.paths.baseDir,
     message,
     sttConfig: config.stt,
     threadKey,
@@ -282,7 +286,7 @@ async function handlePrompt(
     return;
   }
 
-  const workspace = await getWorkspace(threadKey, config.workspace);
+  const workspace = await getWorkspace(threadKey, config.paths.workspace);
   // `snapshotWorkspace` must run before `prompt` so `detectFiles` can diff against the pre-run state.
   const beforeSnapshot = await snapshotWorkspace(workspace);
   await thread.startTyping();
@@ -313,11 +317,11 @@ async function handlePrompt(
 }
 
 export function createBot(config: Config, runtime = new PiRuntime(config)): BotRuntime {
-  configureWorkspaceState(config.baseDir);
+  configureWorkspaceState(config.paths.baseDir);
   const telegram = createTelegramAdapter({
-    apiBaseUrl: config.telegramApiBaseUrl,
-    botToken: config.telegramToken,
-    secretToken: config.telegramWebhookSecret,
+    apiBaseUrl: config.telegram.apiBaseUrl,
+    botToken: config.telegram.botToken,
+    secretToken: config.telegram.webhookSecret,
     mode: "webhook",
   });
   const chat = new Chat({
@@ -331,7 +335,7 @@ export function createBot(config: Config, runtime = new PiRuntime(config)): BotR
   });
 
   chat.onDirectMessage(async (thread, message) => {
-    if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
+    if (!isUserAllowed(config.telegram.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;
     }
@@ -343,7 +347,7 @@ export function createBot(config: Config, runtime = new PiRuntime(config)): BotR
   });
 
   chat.onNewMention(async (thread, message) => {
-    if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
+    if (!isUserAllowed(config.telegram.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;
     }
@@ -355,7 +359,7 @@ export function createBot(config: Config, runtime = new PiRuntime(config)): BotR
   });
 
   chat.onSubscribedMessage(async (thread, message) => {
-    if (!isUserAllowed(config.allowedUsers, message.author.userId)) {
+    if (!isUserAllowed(config.telegram.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;
     }

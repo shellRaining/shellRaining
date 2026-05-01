@@ -78,7 +78,7 @@ async function runCronCondition(
   condition: CronCondition,
   job: AgentCronJob,
 ): Promise<CronConditionResult> {
-  const workspace = await getWorkspace(job.owner.threadKey, config.workspace);
+  const workspace = await getWorkspace(job.owner.threadKey, config.paths.workspace);
   const result = await execCommand(condition.command, workspace, condition.timeoutMs ?? 30_000);
 
   if (result.exitCode === 0) {
@@ -101,10 +101,10 @@ let runtime: PiRuntime;
 const cronService = new CronService<AgentCronPayload, AgentCronOwner>({
   store: cronStore,
   async execute(job, nowMs) {
-    const workspace = await getWorkspace(job.owner.threadKey, config.workspace);
+    const workspace = await getWorkspace(job.owner.threadKey, config.paths.workspace);
     const promptText = buildCronPromptText(job, nowMs);
     const result = await runtime.prompt(
-      { agentId: config.defaultAgent, threadKey: job.owner.threadKey },
+      { agentId: config.telegram.defaultAgent, threadKey: job.owner.threadKey },
       promptText,
       workspace,
     );
@@ -167,5 +167,5 @@ app.post("/webhook/telegram", async (c) => botRuntime.chat.webhooks.telegram(c.r
 
 serve({
   fetch: app.fetch,
-  port: config.port,
+  port: config.server.port,
 });
