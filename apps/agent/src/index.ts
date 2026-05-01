@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { config as loadEnv } from "dotenv";
 import { createBot } from "./bot.js";
-import { loadConfig } from "./config.js";
+import { createConfigService } from "./config.js";
 import { ExecaError, execa } from "execa";
 import {
   CronService,
@@ -34,7 +34,10 @@ if (
   undici.setGlobalDispatcher(new undici.EnvHttpProxyAgent());
 }
 
-const config = await loadConfig();
+const configService = await createConfigService();
+await configService.start();
+const config = configService.current();
+const currentConfig = () => configService.current();
 const cronStore = new CronStore<AgentCronPayload, AgentCronOwner>(config.cron.jobsPath);
 
 async function execCommand(command: string, cwd: string, timeoutMs: number) {
@@ -129,14 +132,14 @@ const cronService = new CronService<AgentCronPayload, AgentCronOwner>({
   runTimeoutMs: config.cron.runTimeoutMs,
   misfireGraceMs: config.cron.misfireGraceMs,
 });
-runtime = new PiRuntime(config, {
+runtime = new PiRuntime(currentConfig, {
   extensionFactories: (threadKey) => {
     const threadId = getThreadIdFromKey(threadKey);
     const chatId = getChatIdFromThreadKey(threadKey);
     return [buildCronExtensionFactory(cronService, { chatId, threadId, threadKey })];
   },
 });
-const botRuntime = createBot(config, runtime);
+const botRuntime = createBot(currentConfig, runtime);
 
 let shuttingDown = false;
 
@@ -146,6 +149,7 @@ async function shutdown(signal: string) {
   }
   shuttingDown = true;
   console.error(`[shellRaining] shutting down on ${signal}`);
+  await configService.stop();
   await runtime.dispose();
   process.exit(0);
 }
