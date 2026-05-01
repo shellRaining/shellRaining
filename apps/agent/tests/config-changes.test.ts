@@ -138,4 +138,30 @@ describe("config changes", () => {
     expect(effective.server.port).toBe(3457);
     expect(effective.paths.baseDir).toBe("/base");
   });
+
+  it("clones restart-required agent config from previous effective config", () => {
+    const previous = createConfig();
+    previous.agents.default = {
+      ...previous.agents.default,
+      aliases: ["rain"],
+    };
+    const next = createConfig();
+    next.agents.default = {
+      ...next.agents.default,
+      aliases: ["next"],
+      displayName: "Next Agent",
+    };
+
+    const effective = buildEffectiveConfig(
+      previous,
+      next,
+      classifyConfigChangePaths([["agents"]]),
+    );
+
+    expect(effective.agents).toEqual(previous.agents);
+    expect(effective.agents.default).not.toBe(previous.agents.default);
+    expect(effective.agents.default?.aliases).toEqual(["rain"]);
+    expect(effective.agents.default?.aliases).not.toBe(previous.agents.default.aliases);
+    expect(effective.agents.default?.displayName).toBe("shellRaining");
+  });
 });

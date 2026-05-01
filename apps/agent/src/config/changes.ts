@@ -57,7 +57,12 @@ export function buildEffectiveConfig(
   classification: ConfigChangeClassification,
 ): Config {
   const effective: Config = {
-    agents: { ...previous.agents },
+    agents: Object.fromEntries(
+      Object.entries(previous.agents).map(([id, agent]) => [
+        id,
+        { ...agent, aliases: [...agent.aliases] },
+      ]),
+    ),
     cron: { ...previous.cron },
     paths: { ...previous.paths },
     server: { ...previous.server },
