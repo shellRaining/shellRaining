@@ -14,9 +14,7 @@ const hotConfigPaths = new Set([
   "stt.model",
 ]);
 
-const hotConfigPathExpansions = new Map([
-  ["stt", ["stt.apiKey", "stt.baseUrl", "stt.model"]],
-]);
+const hotConfigPathExpansions = new Map([["stt", ["stt.apiKey", "stt.baseUrl", "stt.model"]]]);
 
 const restartRequiredConfigPaths = new Set([
   "server.port",
