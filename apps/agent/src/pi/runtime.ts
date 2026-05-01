@@ -92,6 +92,7 @@ async function pathExists(path: string): Promise<boolean> {
 export class PiRuntime {
   private readonly profileWatchers = new Map<string, ProfileWatcher>();
   private readonly sessions = new Map<string, CachedSession>();
+  private readonly pendingSessions = new Map<string, Promise<CachedSession>>();
   /** Tracks in-flight prompt executions per runtime scope for mid-session steering. */
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
 
@@ -300,12 +301,12 @@ export class PiRuntime {
   async steer(scopeInput: RuntimeScopeInput, text: string, images?: PiImageInput[]): Promise<void> {
     const scope = this.normalizeScope(scopeInput);
     const scopeKey = getScopeKey(scope);
-    const cached = this.sessions.get(scopeKey);
-    if (!cached) {
-      throw new Error(`No active session for scope: ${scope.agentId}/${scope.threadKey}`);
-    }
     if (!this.inflight.has(scopeKey)) {
       throw new Error(`No inflight prompt for scope: ${scope.agentId}/${scope.threadKey}`);
+    }
+    const cached = this.sessions.get(scopeKey) ?? (await this.pendingSessions.get(scopeKey));
+    if (!cached) {
+      throw new Error(`No active session for scope: ${scope.agentId}/${scope.threadKey}`);
     }
     await cached.session.steer(text, images);
   }
@@ -323,22 +324,25 @@ export class PiRuntime {
   ): Promise<PiPromptResult> {
     const scope = this.normalizeScope(scopeInput);
     const scopeKey = getScopeKey(scope);
-    const execution = this.runPrompt(scope, text, cwd, callbacks);
+    const session = this.getOrCreateSession(scope, cwd);
+    this.pendingSessions.set(scopeKey, session);
+    const execution = this.runPrompt(scope, session, text, callbacks);
     this.inflight.set(scopeKey, execution);
     try {
       return await execution;
     } finally {
+      this.pendingSessions.delete(scopeKey);
       this.inflight.delete(scopeKey);
     }
   }
 
   private async runPrompt(
     scope: RuntimeScope,
+    cachedSession: Promise<CachedSession>,
     text: string,
-    cwd: string,
     callbacks: PiPromptCallbacks,
   ): Promise<PiPromptResult> {
-    const { session } = await this.getOrCreateSession(scope, cwd);
+    const { session } = await cachedSession;
     let output = "";
     let toolOutput = "";
     let assistantError: string | undefined;

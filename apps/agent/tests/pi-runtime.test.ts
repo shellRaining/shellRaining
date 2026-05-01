@@ -6,6 +6,7 @@ const sessionPrompt = vi.fn();
 const sessionSubscribe = vi.fn((_listener: SessionListener) => () => undefined);
 const sessionDispose = vi.fn();
 const sessionNewSession = vi.fn();
+const sessionSteer = vi.fn();
 const sessionGetActiveToolNames = vi.fn(() => ["read", "bash"]);
 const sessionSetActiveToolsByName = vi.fn();
 const sessionManagerContinueRecent = vi.fn(() => ({ mode: "recent" }));
@@ -45,6 +46,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
       prompt: sessionPrompt,
       setActiveToolsByName: sessionSetActiveToolsByName,
       subscribe: sessionSubscribe,
+      steer: sessionSteer,
       switchSession: vi.fn(),
     },
   })),
@@ -111,6 +113,7 @@ describe("PiRuntime", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionPrompt.mockResolvedValue(undefined);
+    sessionSteer.mockResolvedValue(undefined);
     sessionSubscribe.mockReturnValue(() => undefined);
     sessionNewSession.mockResolvedValue(true);
     sessionManagerContinueRecent.mockReturnValue({ mode: "recent" });
@@ -291,6 +294,55 @@ describe("PiRuntime", () => {
 
     expect(sessionDispose).toHaveBeenCalledTimes(1);
     expect(defaultResourceLoader).toHaveBeenCalledTimes(2);
+  });
+
+  it("queues steer while an inflight prompt is still creating its session", async () => {
+    let resolveCreateSession: (() => void) | undefined;
+    let resolvePrompt: (() => void) | undefined;
+    sessionPrompt.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolvePrompt = resolve;
+        }),
+    );
+    const { createAgentSession } = await import("@mariozechner/pi-coding-agent");
+    vi.mocked(createAgentSession).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCreateSession = () => {
+            resolve({
+              session: {
+                dispose: sessionDispose,
+                getActiveToolNames: sessionGetActiveToolNames,
+                newSession: sessionNewSession,
+                prompt: sessionPrompt,
+                setActiveToolsByName: sessionSetActiveToolsByName,
+                subscribe: sessionSubscribe,
+                steer: sessionSteer,
+                switchSession: vi.fn(),
+              },
+            } as unknown as Awaited<ReturnType<typeof createAgentSession>>);
+          };
+        }),
+    );
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(createRuntimeConfig());
+
+    const prompt = runtime.prompt("telegram__1", "hello", "/mock/workspace");
+    await vi.waitFor(() => expect(runtime.isRunning("telegram__1")).toBe(true));
+    await vi.waitFor(() => expect(createAgentSession).toHaveBeenCalledTimes(1));
+
+    const steer = runtime.steer("telegram__1", "follow up");
+    await Promise.resolve();
+
+    expect(sessionSteer).not.toHaveBeenCalled();
+
+    resolveCreateSession?.();
+    await vi.waitFor(() => expect(sessionSteer).toHaveBeenCalledWith("follow up", undefined));
+    resolvePrompt?.();
+
+    await steer;
+    await prompt;
   });
 
   it("starts one profile watcher for each used Pi profile", async () => {
