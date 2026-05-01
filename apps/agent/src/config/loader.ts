@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { Value } from "@sinclair/typebox/value";
-import { loadConfig as loadC12Config } from "c12";
+import { loadConfig as loadC12Config, type LoadConfigOptions } from "c12";
 import { resolveAgents, resolveDefaultAgent } from "./agents.js";
 import { buildEnvOverrides } from "./env.js";
 import { mergeConfigLayers } from "./merge.js";
@@ -23,8 +23,9 @@ export function getShellRainingConfigPath(): { configured: boolean; path: string
   };
 }
 
-export function createC12ConfigOptions() {
-  const configPath = getShellRainingConfigPath();
+export function createC12ConfigOptions(
+  configPath = getShellRainingConfigPath(),
+): LoadConfigOptions<ShellRainingConfigFile> {
   return {
     configFile: configPath.path,
     configFileRequired: configPath.configured,
@@ -114,6 +115,6 @@ export async function loadShellRainingConfigFile(): Promise<ShellRainingConfigFi
     throw new Error(`shellRaining config file not found: ${configPath.path}`);
   }
 
-  const { config } = await loadC12Config<ShellRainingConfigFile>(createC12ConfigOptions());
+  const { config } = await loadC12Config<ShellRainingConfigFile>(createC12ConfigOptions(configPath));
   return validateConfigFile(config, configPath.path);
 }
