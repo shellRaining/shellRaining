@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
 import { Chat, type Thread } from "chat";
-import type { Config } from "./config.js";
+import { readConfig, type Config, type ConfigSource } from "./config.js";
 import { isUserAllowed } from "./runtime/access-control.js";
 import { detectFiles, snapshotWorkspace } from "./runtime/artifact-detector.js";
 import { splitMessage } from "./runtime/message-splitter.js";
@@ -316,12 +316,16 @@ async function handlePrompt(
   }
 }
 
-export function createBot(config: Config, runtime = new PiRuntime(config)): BotRuntime {
-  configureWorkspaceState(config.paths.baseDir);
+export function createBot(
+  configSource: ConfigSource,
+  runtime = new PiRuntime(configSource),
+): BotRuntime {
+  const initialConfig = readConfig(configSource);
+  configureWorkspaceState(initialConfig.paths.baseDir);
   const telegram = createTelegramAdapter({
-    apiBaseUrl: config.telegram.apiBaseUrl,
-    botToken: config.telegram.botToken,
-    secretToken: config.telegram.webhookSecret,
+    apiBaseUrl: initialConfig.telegram.apiBaseUrl,
+    botToken: initialConfig.telegram.botToken,
+    secretToken: initialConfig.telegram.webhookSecret,
     mode: "webhook",
   });
   const chat = new Chat({
@@ -335,6 +339,7 @@ export function createBot(config: Config, runtime = new PiRuntime(config)): BotR
   });
 
   chat.onDirectMessage(async (thread, message) => {
+    const config = readConfig(configSource);
     if (!isUserAllowed(config.telegram.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;
@@ -347,6 +352,7 @@ export function createBot(config: Config, runtime = new PiRuntime(config)): BotR
   });
 
   chat.onNewMention(async (thread, message) => {
+    const config = readConfig(configSource);
     if (!isUserAllowed(config.telegram.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;
@@ -359,6 +365,7 @@ export function createBot(config: Config, runtime = new PiRuntime(config)): BotR
   });
 
   chat.onSubscribedMessage(async (thread, message) => {
+    const config = readConfig(configSource);
     if (!isUserAllowed(config.telegram.allowedUsers, message.author.userId)) {
       await thread.post("未授权访问。");
       return;

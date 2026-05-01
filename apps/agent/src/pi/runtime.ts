@@ -11,7 +11,7 @@ import {
   type ExtensionFactory,
   type SessionInfo,
 } from "@mariozechner/pi-coding-agent";
-import type { Config } from "../config.js";
+import { readConfig, type ConfigSource } from "../config.js";
 import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
 import { ProfileWatcher } from "./profile-watcher.js";
 import { getSessionDirectoryForScope, getSessionDirectoryForThread } from "./session-store.js";
@@ -96,9 +96,13 @@ export class PiRuntime {
   private readonly inflight = new Map<string, Promise<PiPromptResult>>();
 
   constructor(
-    private readonly config: Config,
+    private readonly configSource: ConfigSource,
     private readonly options: PiRuntimeOptions = {},
   ) {}
+
+  private get config() {
+    return readConfig(this.configSource);
+  }
 
   private async createSession(
     scope: RuntimeScope,
@@ -338,6 +342,7 @@ export class PiRuntime {
     let output = "";
     let toolOutput = "";
     let assistantError: string | undefined;
+    const showThinking = this.config.telegram.showThinking;
 
     const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
       const eventError = getAssistantErrorMessage(event);
@@ -349,10 +354,7 @@ export class PiRuntime {
         if (event.assistantMessageEvent.type === "text_delta") {
           output += event.assistantMessageEvent.delta;
         }
-        if (
-          this.config.telegram.showThinking &&
-          event.assistantMessageEvent.type === "thinking_delta"
-        ) {
+        if (showThinking && event.assistantMessageEvent.type === "thinking_delta") {
           output += event.assistantMessageEvent.delta;
         }
       }

@@ -369,6 +369,33 @@ describe("PiRuntime", () => {
     expect(result?.at(-1)).not.toContain("Pi may append an <available_skills> catalog later");
   });
 
+  it("captures showThinking from the config source at prompt start", async () => {
+    let currentConfig = createRuntimeConfig();
+    sessionSubscribe.mockImplementation((listener: SessionListener) => {
+      sessionPrompt.mockImplementation(async () => {
+        listener({
+          type: "message_update",
+          assistantMessageEvent: { type: "thinking_delta", delta: "thought" },
+        });
+      });
+      return () => undefined;
+    });
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(() => currentConfig);
+
+    let result = await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+    expect(result.text).toBe("(no output)");
+
+    await runtime.newSession("telegram__1", "/mock/workspace");
+    currentConfig = {
+      ...createRuntimeConfig(),
+      telegram: { ...createRuntimeConfig().telegram, showThinking: true },
+    };
+
+    result = await runtime.prompt("telegram__1", "hello", "/mock/workspace");
+    expect(result.text).toBe("thought");
+  });
+
   it("passes image inputs to the Pi session prompt", async () => {
     const { PiRuntime } = await import("../src/pi/runtime.js");
 
