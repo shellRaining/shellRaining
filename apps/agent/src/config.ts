@@ -4,6 +4,7 @@ export type { Config, ResolvedAgentConfig, ShellRainingConfigFile } from "./conf
 export { shellRainingConfigFileSchema } from "./config/schema.js";
 export { buildEffectiveConfig, classifyConfigChangePaths } from "./config/changes.js";
 export type { ConfigChangeClassification } from "./config/changes.js";
+export { ConfigService, createConfigService } from "./config/service.js";
 
 export async function loadConfig() {
   return resolveConfig(await loadShellRainingConfigFile());
