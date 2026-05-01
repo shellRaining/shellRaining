@@ -14,6 +14,10 @@ const hotConfigPaths = new Set([
   "stt.model",
 ]);
 
+const hotConfigPathExpansions = new Map([
+  ["stt", ["stt.apiKey", "stt.baseUrl", "stt.model"]],
+]);
+
 const restartRequiredConfigPaths = new Set([
   "server.port",
   "telegram.botToken",
@@ -41,6 +45,12 @@ export function classifyConfigChangePaths(
     const key = normalizeConfigChangePath(path);
     if (!key) {
       classification.unsupported.push(path.join("."));
+    } else if (hotConfigPathExpansions.has(key)) {
+      for (const expandedKey of hotConfigPathExpansions.get(key) ?? []) {
+        if (!classification.hot.includes(expandedKey)) {
+          classification.hot.push(expandedKey);
+        }
+      }
     } else if (hotConfigPaths.has(key) && !classification.hot.includes(key)) {
       classification.hot.push(key);
     } else if (
@@ -57,7 +67,11 @@ export function classifyConfigChangePaths(
 function normalizeConfigChangePath(path: readonly string[]): string | undefined {
   for (let length = path.length; length > 0; length -= 1) {
     const key = path.slice(0, length).join(".");
-    if (hotConfigPaths.has(key) || restartRequiredConfigPaths.has(key)) {
+    if (
+      hotConfigPaths.has(key) ||
+      (length === path.length && hotConfigPathExpansions.has(key)) ||
+      restartRequiredConfigPaths.has(key)
+    ) {
       return key;
     }
   }

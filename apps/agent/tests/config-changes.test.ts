@@ -158,6 +158,39 @@ describe("config changes", () => {
     expect(effective.paths.baseDir).toBe("/base");
   });
 
+  it("applies stt object additions from parent change paths", () => {
+    const previous = createConfig();
+    const next = createConfig();
+    next.stt = {
+      apiKey: "next-api-key",
+      baseUrl: "https://stt.example.com",
+      model: "next-model",
+    };
+
+    const effective = buildEffectiveConfig(previous, next, classifyConfigChangePaths([["stt"]]));
+
+    expect(effective.stt).toEqual({
+      apiKey: "next-api-key",
+      baseUrl: "https://stt.example.com",
+      model: "next-model",
+    });
+  });
+
+  it("clears stt values when the stt object is removed", () => {
+    const previous = createConfig();
+    previous.stt = {
+      apiKey: "previous-api-key",
+      baseUrl: "https://previous-stt.example.com",
+      model: "previous-model",
+    };
+    const next = createConfig();
+    next.stt = {};
+
+    const effective = buildEffectiveConfig(previous, next, classifyConfigChangePaths([["stt"]]));
+
+    expect(effective.stt).toEqual({});
+  });
+
   it("clones restart-required agent config from previous effective config", () => {
     const previous = createConfig();
     previous.agents.default = {
