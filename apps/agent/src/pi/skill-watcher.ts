@@ -35,7 +35,7 @@ export class SkillWatcher {
     }
 
     this.watchedPaths.add(path);
-    await this.watcher.add(path);
+    this.watcher.add(path);
   }
 
   private scheduleReload(): void {

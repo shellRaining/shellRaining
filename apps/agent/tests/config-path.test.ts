@@ -2,12 +2,8 @@ import { describe, expect, it } from "vitest";
 
 describe("config path helpers", () => {
   it("centralizes shellRaining default paths", async () => {
-    const {
-      DEFAULT_BASE_DIR,
-      DEFAULT_WORKSPACE,
-      resolveDefaultBaseDir,
-      resolveDefaultWorkspace,
-    } = await import("../src/config/path.js");
+    const { DEFAULT_BASE_DIR, DEFAULT_WORKSPACE, resolveDefaultBaseDir, resolveDefaultWorkspace } =
+      await import("../src/config/path.js");
 
     expect(DEFAULT_BASE_DIR).toBe("~/.shellRaining");
     expect(DEFAULT_WORKSPACE).toBe("shellRaining-workspace");
@@ -35,9 +31,7 @@ describe("config path helpers", () => {
     );
     expect(getTelegramInboxDisplayPath()).toBe("~/.shellRaining/inbox/");
     expect(getProfileRoot("/base", "coder")).toBe("/base/pi-profiles/coder");
-    expect(getSessionDirectoryForThread("/base", "telegram__1")).toBe(
-      "/base/sessions/telegram__1",
-    );
+    expect(getSessionDirectoryForThread("/base", "telegram__1")).toBe("/base/sessions/telegram__1");
     expect(
       getSessionDirectoryForScope("/base", { agentId: "coder", threadKey: "telegram__1" }),
     ).toBe("/base/sessions/coder/telegram__1");

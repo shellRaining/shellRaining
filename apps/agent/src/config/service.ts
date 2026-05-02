@@ -25,13 +25,11 @@ type ConfigWatcher = {
 
 export class ConfigService {
   private effectiveConfig: Config;
-  private loadedConfig: Config;
   private listeners = new Set<ConfigListener>();
   private watcher?: ConfigWatcher;
 
   constructor(initialConfig: Config) {
     this.effectiveConfig = initialConfig;
-    this.loadedConfig = initialConfig;
   }
 
   current(): Config {
@@ -89,14 +87,13 @@ export class ConfigService {
       );
     }
 
-    this.loadedConfig = nextLoaded;
     const nextEffective = buildEffectiveConfig(this.effectiveConfig, nextLoaded, classification);
     if (JSON.stringify(nextEffective) === JSON.stringify(this.effectiveConfig)) {
       return;
     }
 
     this.effectiveConfig = nextEffective;
-    await Promise.all([...this.listeners].map((listener) => listener(nextEffective)));
+    await Promise.all([...this.listeners].map(async (listener) => listener(nextEffective)));
   }
 }
 

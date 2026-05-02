@@ -10,11 +10,11 @@
     "typecheck": "pnpm -r --if-present build && pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "test:watch": "vitest",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
+    "lint": "oxlint --type-aware --type-check",
+    "lint:fix": "oxlint --type-aware --type-check --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "check": "oxlint && oxfmt --check && pnpm typecheck"
+    "check": "pnpm lint && oxfmt --check && pnpm typecheck"
   },
   "devDependencies": {
     "@types/luxon": "^3.7.1",
@@ -22,6 +22,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260416.2",
     "oxfmt": "^0.45.0",
     "oxlint": "^1.60.0",
+    "oxlint-tsgolint": "^0.22.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
