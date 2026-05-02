@@ -76,7 +76,7 @@ describe("config", () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
     const { loadConfig } = await import("../src/config.js");
     const config = await loadConfig();
-    expect(config.paths.workspace).toBe("/mock/home/shellRaining-workspace");
+    expect(config.paths.workspace).toBe("/mock/home/.shellRaining/shellRaining-workspace");
     expect(config.paths.baseDir).toBe("/mock/home/.shellRaining");
     expect(config.telegram.defaultAgent).toBe("default");
     expect(config.agents).toEqual({

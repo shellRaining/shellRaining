@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { getTelegramInboxPath } from "../config/path.js";
 
 export type TelegramSavedAttachmentType = "image" | "file" | "audio" | "video";
 
@@ -68,9 +69,8 @@ export async function saveTelegramAttachment(
     input.attachment.filename,
     input.attachment.fallbackFilename,
   );
-  const directory = join(
+  const directory = getTelegramInboxPath(
     input.baseDir,
-    "inbox",
     safePathSegment(input.threadKey),
     safePathSegment(input.messageId),
   );

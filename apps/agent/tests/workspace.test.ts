@@ -27,10 +27,10 @@ describe("workspace", () => {
     mockWriteFile.mockResolvedValue(undefined);
   });
 
-  it("returns home directory when no state exists", async () => {
+  it("returns explicit fallback workspace when no state exists", async () => {
     const { getWorkspace } = await import("../src/runtime/workspace.js");
-    const result = await getWorkspace("thread-123");
-    expect(result).toBe("/mock/home");
+    const result = await getWorkspace("thread-123", "/configured/workspace");
+    expect(result).toBe("/configured/workspace");
   });
 
   it("returns stored workspace when it exists", async () => {
@@ -38,7 +38,7 @@ describe("workspace", () => {
     mockStat.mockResolvedValue({ isDirectory: () => true });
 
     const { getWorkspace } = await import("../src/runtime/workspace.js");
-    const result = await getWorkspace("thread-123");
+    const result = await getWorkspace("thread-123", "/configured/workspace");
     expect(result).toBe("/stored/path");
   });
 
@@ -47,11 +47,24 @@ describe("workspace", () => {
     mockStat.mockResolvedValue({ isDirectory: () => true });
 
     const { setWorkspace } = await import("../src/runtime/workspace.js");
-    const result = await setWorkspace("thread-123", "~/projects");
+    const result = await setWorkspace("thread-123", "~/projects", "/configured/workspace");
     expect(result).toBe("/mock/home/projects");
     expect(mockWriteFile).toHaveBeenCalledWith(
       "/mock/home/.shellRaining/state/workspaces.json",
       expect.stringContaining("/mock/home/projects"),
+    );
+  });
+
+  it("uses the centralized default baseDir for initial workspace state storage", async () => {
+    mockAccess.mockResolvedValue(undefined);
+    mockStat.mockResolvedValue({ isDirectory: () => true });
+
+    const { setWorkspace } = await import("../src/runtime/workspace.js");
+    await setWorkspace("thread-123", "~/projects", "/configured/workspace");
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      "/mock/home/.shellRaining/state/workspaces.json",
+      expect.any(String),
     );
   });
 

@@ -418,6 +418,7 @@ describe("PiRuntime", () => {
 
     expect(result).toContain("base prompt");
     expect(result?.at(-1)).toContain("Telegram output is a chat surface");
+    expect(result?.at(-1)).toContain("~/.shellRaining/inbox/");
     expect(result?.at(-1)).not.toContain("Pi may append an <available_skills> catalog later");
   });
 

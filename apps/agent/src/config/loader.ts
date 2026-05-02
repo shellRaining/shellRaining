@@ -1,12 +1,20 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { Value } from "@sinclair/typebox/value";
 import { loadConfig as loadC12Config, type LoadConfigOptions } from "c12";
 import { resolveAgents, resolveDefaultAgent } from "./agents.js";
 import { buildEnvOverrides } from "./env.js";
 import { mergeConfigLayers } from "./merge.js";
-import { expandHome, trimTrailingSlashes } from "./path.js";
+import {
+  DEFAULT_WORKSPACE,
+  expandHome,
+  getConfigPath,
+  getCronJobsPath,
+  resolveDefaultBaseDir,
+  resolveWorkspacePath,
+  trimTrailingSlashes,
+} from "./path.js";
 import {
   shellRainingConfigDefaults,
   shellRainingConfigFileSchema,
@@ -19,7 +27,7 @@ export function getShellRainingConfigPath(): { configured: boolean; path: string
   const configuredConfigPath = process.env.SHELL_RAINING_CONFIG?.trim();
   return {
     configured: Boolean(configuredConfigPath),
-    path: expandHome(configuredConfigPath || join(homedir(), ".shellRaining", "config.json")),
+    path: expandHome(configuredConfigPath || getConfigPath()),
   };
 }
 
@@ -64,9 +72,12 @@ export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
   }
 
   const home = homedir();
-  const baseDir = expandHome(fileConfig.paths?.baseDir ?? join(home, ".shellRaining"), home);
-  const workspace = expandHome(
-    fileConfig.paths?.workspace ?? join(home, "shellRaining-workspace"),
+  const baseDir = fileConfig.paths?.baseDir
+    ? expandHome(fileConfig.paths.baseDir, home)
+    : resolveDefaultBaseDir(home);
+  const workspace = resolveWorkspacePath(
+    fileConfig.paths?.workspace ?? DEFAULT_WORKSPACE,
+    baseDir,
     home,
   );
   const agents = resolveAgents(fileConfig.agents, baseDir);
@@ -94,7 +105,7 @@ export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
     agents,
     cron: {
       jobsPath: expandHome(
-        resolveConfigValue(fileConfig.cron?.jobsPath) || join(baseDir, "cron", "jobs.json"),
+        resolveConfigValue(fileConfig.cron?.jobsPath) || getCronJobsPath(baseDir),
         home,
       ),
       runTimeoutMs: fileConfig.cron?.runTimeoutMs ?? 5 * 60 * 1000,

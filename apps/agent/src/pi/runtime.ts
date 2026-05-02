@@ -12,6 +12,7 @@ import {
   type SessionInfo,
 } from "@mariozechner/pi-coding-agent";
 import { readConfig, type ConfigSource } from "../config.js";
+import { getTelegramInboxDisplayPath } from "../config/path.js";
 import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
 import { ProfileWatcher } from "./profile-watcher.js";
 import { getSessionDirectoryForScope, getSessionDirectoryForThread } from "./session-store.js";
@@ -128,7 +129,7 @@ export class PiRuntime {
         buildShellRainingSystemPrompt({
           environmentName: "shellRaining",
           telegram: {
-            inboxDir: "~/.shellRaining/inbox/",
+            inboxDir: getTelegramInboxDisplayPath(),
             outputStyle: "chat",
           },
         }),

@@ -1,5 +1,5 @@
-import { join } from "node:path";
 import type { ResolvedAgentConfig, ShellRainingConfigFile } from "./schema.js";
+import { getProfileRoot } from "./path.js";
 
 function isSafeRegistryId(value: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value);
@@ -48,7 +48,7 @@ export function resolveAgents(
         displayName: "shellRaining",
         id: "default",
         piProfile: "default",
-        profileRoot: join(baseDir, "pi-profiles", "default"),
+        profileRoot: getProfileRoot(baseDir, "default"),
       },
     };
   }
@@ -79,7 +79,7 @@ export function resolveAgents(
       displayName: agent?.displayName?.trim() || agentId,
       id: agentId,
       piProfile,
-      profileRoot: join(baseDir, "pi-profiles", piProfile),
+      profileRoot: getProfileRoot(baseDir, piProfile),
     };
   }
 

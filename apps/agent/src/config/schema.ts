@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { DEFAULT_BASE_DIR, DEFAULT_WORKSPACE } from "./path.js";
 
 /** Application configuration loaded from environment variables (or `.env` file). */
 export interface Config {
@@ -136,8 +137,8 @@ export const shellRainingConfigDefaults: ShellRainingConfigFile = {
     runTimeoutMs: 5 * 60 * 1000,
   },
   paths: {
-    baseDir: "~/.shellRaining",
-    workspace: "~/shellRaining-workspace",
+    baseDir: DEFAULT_BASE_DIR,
+    workspace: DEFAULT_WORKSPACE,
   },
   server: {
     port: 3457,

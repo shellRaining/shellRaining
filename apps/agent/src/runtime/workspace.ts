@@ -1,8 +1,9 @@
 import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { getWorkspaceStatePath, resolveDefaultBaseDir } from "../config/path.js";
 
-let stateFilePath = join(homedir(), ".shellRaining", "state", "workspaces.json");
+let stateFilePath = getWorkspaceStatePath(resolveDefaultBaseDir());
 
 interface WorkspaceState {
   [threadId: string]: string;
@@ -38,18 +39,15 @@ async function saveState(): Promise<void> {
 /**
  * Reconfigures the workspace state file path. Called once at startup so that
  * state is stored relative to the configured `baseDir` rather than the default
- * `~/.shellRaining/state/`. Also resets in-memory state, which is necessary
+ * baseDir. Also resets in-memory state, which is necessary
  * between test runs.
  */
 export function configureWorkspaceState(baseDir: string): void {
-  stateFilePath = join(baseDir, "state", "workspaces.json");
+  stateFilePath = getWorkspaceStatePath(baseDir);
   resetWorkspaceStateForTesting();
 }
 
-export async function getWorkspace(
-  threadId: string,
-  fallbackWorkspace: string = homedir(),
-): Promise<string> {
+export async function getWorkspace(threadId: string, fallbackWorkspace: string): Promise<string> {
   await loadState();
   const cwd = state[threadId];
 
@@ -75,7 +73,7 @@ export async function getWorkspace(
 export async function setWorkspace(
   threadId: string,
   path: string,
-  fallbackWorkspace: string = homedir(),
+  fallbackWorkspace: string,
 ): Promise<string> {
   await loadState();
 

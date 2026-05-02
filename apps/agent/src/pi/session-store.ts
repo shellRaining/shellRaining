@@ -1,4 +1,7 @@
-import { join } from "node:path";
+import {
+  getSessionDirectoryForScope as getConfigSessionDirectoryForScope,
+  getSessionDirectoryForThread as getConfigSessionDirectoryForThread,
+} from "../config/path.js";
 
 /**
  * Replaces `:` with `__` because `:` is not safe for filesystem paths
@@ -19,12 +22,12 @@ export function getChatIdFromThreadKey(threadKey: string): number {
 }
 
 export function getSessionDirectoryForThread(baseDir: string, threadKey: string): string {
-  return join(baseDir, "sessions", threadKey);
+  return getConfigSessionDirectoryForThread(baseDir, threadKey);
 }
 
 export function getSessionDirectoryForScope(
   baseDir: string,
   scope: { agentId: string; threadKey: string },
 ): string {
-  return join(baseDir, "sessions", scope.agentId, scope.threadKey);
+  return getConfigSessionDirectoryForScope(baseDir, scope);
 }
