@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
 import { Chat, type Thread } from "chat";
-import { readConfig, type Config, type ConfigSource } from "./config.js";
+import { readConfig, type Config, type ConfigSource } from "./config/index.js";
 import { isUserAllowed } from "./runtime/access-control.js";
 import { detectFiles, snapshotWorkspace } from "./runtime/artifact-detector.js";
 import { splitMessage } from "./runtime/message-splitter.js";

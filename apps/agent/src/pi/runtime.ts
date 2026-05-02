@@ -11,7 +11,7 @@ import {
   type ExtensionFactory,
   type SessionInfo,
 } from "@mariozechner/pi-coding-agent";
-import { readConfig, type ConfigSource } from "../config.js";
+import { readConfig, type ConfigSource } from "../config/index.js";
 import { getTelegramInboxDisplayPath } from "../config/path.js";
 import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
 import { ProfileWatcher } from "./profile-watcher.js";

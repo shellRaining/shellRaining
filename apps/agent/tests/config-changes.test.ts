@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Config } from "../src/config.js";
-import { buildEffectiveConfig, classifyConfigChangePaths } from "../src/config.js";
+import type { Config } from "../src/config/index.js";
+import { buildEffectiveConfig, classifyConfigChangePaths } from "../src/config/index.js";
 
 function createConfig(): Config {
   return {

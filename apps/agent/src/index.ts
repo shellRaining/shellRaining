@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { config as loadEnv } from "dotenv";
 import { createBot } from "./bot.js";
-import { createConfigService } from "./config.js";
+import { createConfigService } from "./config/index.js";
 import { ExecaError, execa } from "execa";
 import {
   CronService,

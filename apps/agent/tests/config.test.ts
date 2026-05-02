@@ -25,7 +25,7 @@ describe("config", () => {
 
   it("throws when TELEGRAM_BOT_TOKEN is missing", async () => {
     delete process.env.TELEGRAM_BOT_TOKEN;
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     await expect(loadConfig()).rejects.toThrow("TELEGRAM_BOT_TOKEN is required");
   });
 
@@ -47,7 +47,7 @@ describe("config", () => {
     delete process.env.SHELL_RAINING_CONFIG;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.botToken).toBe("dotenv-token");
@@ -65,7 +65,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     process.env.TELEGRAM_BOT_TOKEN = "env-token";
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.botToken).toBe("env-token");
@@ -74,7 +74,7 @@ describe("config", () => {
 
   it("uses shellRaining defaults", async () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
     expect(config.paths.workspace).toBe("/mock/home/.shellRaining/shellRaining-workspace");
     expect(config.paths.baseDir).toBe("/mock/home/.shellRaining");
@@ -124,7 +124,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.defaultAgent).toBe("coder");
@@ -161,7 +161,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow("Invalid Pi profile id");
   });
@@ -182,7 +182,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).resolves.toHaveProperty("telegram.defaultAgent", "coder");
   });
@@ -202,7 +202,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow("Default agent is not configured: missing");
   });
@@ -222,7 +222,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow("Invalid agent id");
   });
@@ -242,7 +242,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow("Invalid agent alias");
   });
@@ -263,7 +263,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow("Duplicate agent alias or id: reviewer");
   });
@@ -284,7 +284,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow("Duplicate agent alias or id: shared");
   });
@@ -322,7 +322,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.botToken).toBe("file-token");
@@ -362,7 +362,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_ALLOWED_USERS = "789,101";
     process.env.SHELL_RAINING_SHOW_THINKING = "true";
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.botToken).toBe("env-token");
@@ -390,7 +390,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     process.env.SHELL_RAINING_ALLOWED_USERS = "333,444";
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.allowedUsers).toEqual([333, 444]);
@@ -409,7 +409,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     process.env.SHELL_RAINING_PORT = "not-a-number";
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.server.port).toBe(4567);
@@ -431,7 +431,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.botToken).toBe("file-token");
@@ -453,7 +453,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.botToken).toBe("file-token");
@@ -473,7 +473,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*\/pi/);
   });
@@ -488,7 +488,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*\/server\/port/);
   });
@@ -507,7 +507,7 @@ describe("config", () => {
     const schema = JSON.parse(
       await readFile(join(import.meta.dirname, "..", "schema", "config.schema.json"), "utf8"),
     );
-    const { shellRainingConfigFileSchema } = await import("../src/config.js");
+    const { shellRainingConfigFileSchema } = await import("../src/config/index.js");
 
     expect(schema).toEqual(JSON.parse(JSON.stringify(shellRainingConfigFileSchema)));
   });
@@ -522,7 +522,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*\/agent/);
   });
@@ -541,7 +541,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CONFIG = configPath;
     delete process.env.TELEGRAM_BOT_TOKEN;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
 
     await expect(loadConfig()).rejects.toThrow(/config\.json[\s\S]*(\/paths\/agentDir|\/agent)/);
   });
@@ -568,7 +568,7 @@ describe("config", () => {
     delete process.env.TELEGRAM_WEBHOOK_SECRET;
     delete process.env.SHELL_RAINING_STT_API_KEY;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.botToken).toBe("env:TELEGRAM_BOT_TOKEN");
@@ -583,7 +583,7 @@ describe("config", () => {
     delete process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS;
     delete process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS;
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.cron.jobsPath).toContain(".shellRaining/cron/jobs.json");
@@ -597,7 +597,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS = " 120000 ";
     process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS = " 45000 ";
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.cron.jobsPath).toBe("/tmp/custom-cron/jobs.json");
@@ -610,7 +610,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_CRON_RUN_TIMEOUT_MS = "not-a-number";
     process.env.SHELL_RAINING_CRON_MISFIRE_GRACE_MS = "   ";
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.cron.runTimeoutMs).toBe(5 * 60 * 1000);
@@ -620,7 +620,7 @@ describe("config", () => {
   it("parses allowed users", async () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
     process.env.SHELL_RAINING_ALLOWED_USERS = "123,456";
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
     expect(config.telegram.allowedUsers).toEqual([123, 456]);
   });
@@ -631,7 +631,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_STT_API_KEY = " stt-secret ";
     process.env.SHELL_RAINING_STT_MODEL = " faster-whisper-large-v3 ";
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.stt).toEqual({
@@ -645,7 +645,7 @@ describe("config", () => {
     process.env.TELEGRAM_BOT_TOKEN = "test-token";
     process.env.TELEGRAM_API_BASE_URL = " http://127.0.0.1:8081/ ";
 
-    const { loadConfig } = await import("../src/config.js");
+    const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
 
     expect(config.telegram.apiBaseUrl).toBe("http://127.0.0.1:8081");

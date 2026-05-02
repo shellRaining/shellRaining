@@ -64,7 +64,7 @@ describe("config service", () => {
   it("starts with the same resolved config as loadConfig", async () => {
     loadConfigMock.mockResolvedValue({ config: fileConfig() });
 
-    const { createConfigService, loadConfig } = await import("../src/config.js");
+    const { createConfigService, loadConfig } = await import("../src/config/index.js");
 
     const loaded = await loadConfig();
     const service = await createConfigService();
@@ -76,7 +76,7 @@ describe("config service", () => {
     loadConfigMock.mockResolvedValue({
       config: fileConfig({ server: { port: 3457 }, stt: { model: "old-model" } }),
     });
-    const { createConfigService } = await import("../src/config.js");
+    const { createConfigService } = await import("../src/config/index.js");
     const service = await createConfigService();
     await service.start();
     const listener = vi.fn(async () => undefined);
@@ -111,7 +111,7 @@ describe("config service", () => {
 
   it("stops the C12 watcher", async () => {
     loadConfigMock.mockResolvedValue({ config: fileConfig() });
-    const { createConfigService } = await import("../src/config.js");
+    const { createConfigService } = await import("../src/config/index.js");
     const service = await createConfigService();
     await service.start();
 
@@ -123,7 +123,7 @@ describe("config service", () => {
 
   it("keeps current config and subscribers silent when watched config is invalid", async () => {
     loadConfigMock.mockResolvedValue({ config: fileConfig() });
-    const { createConfigService } = await import("../src/config.js");
+    const { createConfigService } = await import("../src/config/index.js");
     const service = await createConfigService();
     await service.start();
     const previous = service.current();
