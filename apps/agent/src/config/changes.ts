@@ -41,7 +41,7 @@ export function classifyConfigChangePaths(
 
   for (const path of paths) {
     const key = normalizeConfigChangePath(path);
-    if (!key) {
+    if (key === undefined) {
       classification.unsupported.push(path.join("."));
     } else if (hotConfigPathExpansions.has(key)) {
       for (const expandedKey of hotConfigPathExpansions.get(key) ?? []) {

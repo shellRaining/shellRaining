@@ -88,7 +88,7 @@ export class CronService<TPayload = unknown, TOwner = unknown> {
     return true;
   }
 
-  async run(jobId: string): Promise<CronJob<TPayload, TOwner> | undefined> {
+  run(jobId: string): Promise<CronJob<TPayload, TOwner> | undefined> {
     return this.runJob(jobId, true);
   }
 
@@ -113,7 +113,7 @@ export class CronService<TPayload = unknown, TOwner = unknown> {
         (job) =>
           job.enabled && job.state.nextRunAtMs !== undefined && job.state.nextRunAtMs <= nowMs,
       )
-      .sort((left, right) => (left.state.nextRunAtMs ?? 0) - (right.state.nextRunAtMs ?? 0));
+      .toSorted((left, right) => (left.state.nextRunAtMs ?? 0) - (right.state.nextRunAtMs ?? 0));
 
     for (const job of dueJobs) {
       await this.runJob(job.id, false);

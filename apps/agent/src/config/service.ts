@@ -7,6 +7,12 @@ import {
 } from "./loader.js";
 import type { Config, ShellRainingConfigFile } from "./schema.js";
 
+function assertIsShellRainingConfigFile(value: unknown): asserts value is ShellRainingConfigFile {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("Expected config to be an object");
+  }
+}
+
 type ConfigListener = (config: Config) => void | Promise<void>;
 
 type ConfigDiffEntry = {
@@ -44,7 +50,7 @@ export class ConfigService {
   }
 
   async start(): Promise<void> {
-    if (this.watcher) {
+    if (this.watcher !== undefined) {
       return;
     }
 
@@ -58,7 +64,7 @@ export class ConfigService {
 
   async stop(): Promise<void> {
     const watcher = this.watcher;
-    if (!watcher) {
+    if (watcher === undefined) {
       return;
     }
 
@@ -69,13 +75,16 @@ export class ConfigService {
   private async handleUpdate(event: ConfigUpdateEvent): Promise<void> {
     let nextLoaded: Config;
     try {
-      nextLoaded = resolveLoadedConfig(event.newConfig.config as ShellRainingConfigFile);
+      assertIsShellRainingConfigFile(event.newConfig.config);
+      nextLoaded = resolveLoadedConfig(event.newConfig.config);
     } catch (error) {
       console.error("[config-service] invalid watched config", error);
       return;
     }
 
-    const classification = classifyConfigChangePaths(event.getDiff().map(diffEntryToPath));
+    const classification = classifyConfigChangePaths(
+      event.getDiff().map((entry) => diffEntryToPath(entry)),
+    );
     if (classification.restartRequired.length > 0) {
       console.error(
         `[config-service] restart required for config paths: ${classification.restartRequired.join(", ")}`,
@@ -93,16 +102,18 @@ export class ConfigService {
     }
 
     this.effectiveConfig = nextEffective;
-    await Promise.all([...this.listeners].map(async (listener) => listener(nextEffective)));
+    await Promise.all(
+      [...this.listeners].map((listener) => Promise.resolve(listener(nextEffective))),
+    );
   }
 }
 
 function diffEntryToPath(entry: ConfigDiffEntry): string[] {
-  if (entry.path) {
+  if (entry.path !== undefined) {
     return entry.path;
   }
 
-  return entry.key ? entry.key.split(".") : [];
+  return entry.key === undefined ? [] : entry.key.split(".");
 }
 
 export async function createConfigService(): Promise<ConfigService> {

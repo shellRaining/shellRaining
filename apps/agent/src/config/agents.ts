@@ -40,8 +40,8 @@ export function resolveAgents(
   agents: ShellRainingConfigFile["agents"],
   baseDir: string,
 ): Record<string, ResolvedAgentConfig> {
-  const entries = agents && Object.keys(agents).length > 0 ? agents : undefined;
-  if (!entries) {
+  const entries = agents !== undefined && Object.keys(agents).length > 0 ? agents : undefined;
+  if (entries === undefined) {
     return {
       default: {
         aliases: [],
@@ -55,7 +55,7 @@ export function resolveAgents(
 
   const resolved: Record<string, ResolvedAgentConfig> = {};
   const claimedIds = new Set<string>();
-  for (const agentId of Object.keys(entries).sort()) {
+  for (const agentId of Object.keys(entries).toSorted()) {
     assertSafeAgentId(agentId);
     if (claimedIds.has(agentId)) {
       throw new Error(`Duplicate agent alias or id: ${agentId}`);
@@ -63,9 +63,9 @@ export function resolveAgents(
     claimedIds.add(agentId);
   }
 
-  for (const agentId of Object.keys(entries).sort()) {
+  for (const agentId of Object.keys(entries).toSorted()) {
     const agent = entries[agentId];
-    const piProfile = agent?.piProfile?.trim() || agentId;
+    const piProfile = agent?.piProfile?.trim() ?? agentId;
     assertSafePiProfileId(piProfile);
     const aliases = normalizeAliases(agent?.aliases);
     for (const alias of aliases) {
@@ -76,7 +76,7 @@ export function resolveAgents(
     }
     resolved[agentId] = {
       aliases,
-      displayName: agent?.displayName?.trim() || agentId,
+      displayName: agent?.displayName?.trim() ?? agentId,
       id: agentId,
       piProfile,
       profileRoot: getProfileRoot(baseDir, piProfile),
@@ -91,11 +91,11 @@ export function resolveDefaultAgent(
   agents: Record<string, ResolvedAgentConfig>,
 ): string {
   const configured = configuredDefaultAgent?.trim();
-  if (configured && agents[configured]) {
+  if (configured !== undefined && agents[configured] !== undefined) {
     return configured;
   }
-  if (configured) {
+  if (configured !== undefined) {
     throw new Error(`Default agent is not configured: ${configured}`);
   }
-  return Object.keys(agents).sort()[0] ?? "default";
+  return Object.keys(agents).toSorted()[0] ?? "default";
 }

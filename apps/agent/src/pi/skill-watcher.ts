@@ -21,15 +21,21 @@ export class SkillWatcher {
       },
     });
 
-    this.watcher.on("add", () => this.scheduleReload());
-    this.watcher.on("change", () => this.scheduleReload());
-    this.watcher.on("unlink", () => this.scheduleReload());
+    this.watcher.on("add", () => {
+      this.scheduleReload();
+    });
+    this.watcher.on("change", () => {
+      this.scheduleReload();
+    });
+    this.watcher.on("unlink", () => {
+      this.scheduleReload();
+    });
     this.watcher.on("error", (error) => {
       console.error("[skill-watcher] watcher error", error);
     });
   }
 
-  async addPath(path: string): Promise<void> {
+  addPath(path: string): void {
     if (this.watchedPaths.has(path)) {
       return;
     }

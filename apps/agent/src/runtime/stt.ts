@@ -23,23 +23,25 @@ function trimTrailingSlashes(value: string): string {
 /** Calls a Whisper-compatible API at `/v1/audio/transcriptions`. Returns `undefined` when `baseUrl` is not configured. */
 export async function transcribeAudio(input: TranscribeAudioInput): Promise<string | undefined> {
   const baseUrl = input.config.baseUrl?.trim();
-  if (!baseUrl) {
+  if (baseUrl === undefined || baseUrl === "") {
     return undefined;
   }
 
   const form = new FormData();
-  form.append("model", input.config.model?.trim() || "whisper-1");
+  form.append("model", input.config.model?.trim() ?? "whisper-1");
   form.append(
     "file",
     new Blob([new Uint8Array(input.data)], {
-      type: input.mimeType || "application/octet-stream",
+      type: input.mimeType ?? "application/octet-stream",
     }),
     input.filename,
   );
 
-  const headers = input.config.apiKey?.trim()
-    ? { Authorization: `Bearer ${input.config.apiKey.trim()}` }
-    : undefined;
+  const trimmedApiKey = input.config.apiKey?.trim();
+  const headers =
+    trimmedApiKey !== undefined && trimmedApiKey !== ""
+      ? { Authorization: `Bearer ${trimmedApiKey}` }
+      : undefined;
 
   const response = await fetch(`${trimTrailingSlashes(baseUrl)}/v1/audio/transcriptions`, {
     method: "POST",
@@ -52,6 +54,8 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<stri
     throw new Error(`STT transcription failed: ${response.status}${body ? ` ${body}` : ""}`);
   }
 
-  const payload = (await response.json()) as { text?: unknown };
+  const raw: unknown = await response.json();
+  const text = typeof raw === "object" && raw !== null && "text" in raw ? raw.text : undefined;
+  const payload = { text };
   return typeof payload.text === "string" ? payload.text : undefined;
 }

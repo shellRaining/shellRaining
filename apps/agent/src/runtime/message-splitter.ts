@@ -37,13 +37,14 @@ export function splitMessage(
       splitIndex = maxLength;
     }
 
-    while (
-      splitByNewline &&
-      splitIndex > 0 &&
-      remaining[splitIndex] === "\n" &&
-      remaining[splitIndex - 1] === "\n"
-    ) {
-      splitIndex -= 1;
+    if (splitByNewline) {
+      while (
+        splitIndex > 0 &&
+        remaining[splitIndex] === "\n" &&
+        remaining[splitIndex - 1] === "\n"
+      ) {
+        splitIndex -= 1;
+      }
     }
 
     chunks.push(remaining.slice(0, splitIndex));

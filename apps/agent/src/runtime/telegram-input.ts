@@ -32,6 +32,15 @@ export interface TelegramInputMessage {
   text?: string | null;
 }
 
+export function isTelegramInputMessage(value: unknown): value is TelegramInputMessage {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof (value as Record<string, unknown>).id === "string"
+  );
+}
+
 /** Options for normalizing a Telegram message into a unified format for the Pi agent. */
 export interface NormalizeTelegramInputOptions {
   /** Root directory for saving attachments. */
@@ -93,10 +102,10 @@ function formatAttachmentProcessingFailure(
   index: number,
   message: string,
 ): string {
-  const label = attachment.name || String(index + 1);
+  const label = attachment.name ?? String(index + 1);
   if (/file is too big/i.test(message)) {
     const size = formatAttachmentSize(attachment.size);
-    const sizeSuffix = size ? ` (${size})` : "";
+    const sizeSuffix = size === undefined ? "" : ` (${size})`;
     return [
       `Telegram refused to download attachment ${label}${sizeSuffix}: ${message}.`,
       "This is a Telegram Bot API download limit, not a shellRaining internal file size limit.",
@@ -119,6 +128,100 @@ async function loadAttachmentData(attachment: Attachment): Promise<Buffer> {
   throw new Error("Attachment has no data or fetchData()");
 }
 
+interface AttachmentProcessingState {
+  parts: string[];
+  images: PiImageInput[];
+  savedFiles: SavedTelegramAttachment[];
+  documentLines: string[];
+  warnings: string[];
+}
+
+async function tryTranscribeAudio(
+  transcribe: (input: TranscribeAudioInput) => Promise<string | undefined>,
+  sttConfig: SttConfig,
+  data: Buffer,
+  saved: SavedTelegramAttachment,
+  state: AttachmentProcessingState,
+): Promise<void> {
+  if (sttConfig.baseUrl === undefined || sttConfig.baseUrl === "") {
+    return;
+  }
+  try {
+    const transcript = await transcribe({
+      config: sttConfig,
+      data,
+      filename: saved.filename,
+      mimeType: saved.mimeType,
+    });
+    if (transcript !== undefined && transcript.trim() !== "") {
+      state.parts.push(`[Telegram voice transcript]\n${transcript.trim()}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    state.warnings.push(`STT failed for ${saved.filename}: ${message}`);
+  }
+}
+
+async function processAttachment(
+  attachment: Attachment,
+  index: number,
+  options: NormalizeTelegramInputOptions,
+  transcribe: (input: TranscribeAudioInput) => Promise<string | undefined>,
+  state: AttachmentProcessingState,
+): Promise<void> {
+  try {
+    const data = await loadAttachmentData(attachment);
+    const saved = await saveTelegramAttachment({
+      attachment: {
+        data,
+        fallbackFilename: fallbackFilename(attachment.type, index),
+        filename: attachment.name,
+        mimeType: attachment.mimeType,
+        type: attachmentType(attachment.type),
+      },
+      baseDir: options.baseDir,
+      messageId: options.message.id,
+      threadKey: options.threadKey,
+    });
+    state.savedFiles.push(saved);
+    if (attachment.type === "image") {
+      const mimeType = attachment.mimeType ?? "image/jpeg";
+      if (mimeType.startsWith("image/")) {
+        state.images.push({
+          type: "image",
+          data: data.toString("base64"),
+          mimeType,
+        });
+        state.parts.push(`[Telegram image: ${saved.path}]`);
+      } else {
+        state.warnings.push(
+          `Image attachment ${saved.filename} did not include an image MIME type.`,
+        );
+        state.documentLines.push(
+          `- ${saved.filename}${saved.mimeType === undefined ? "" : ` (${saved.mimeType})`}: ${saved.path}`,
+        );
+      }
+      return;
+    }
+    if (attachment.type === "audio") {
+      await tryTranscribeAudio(transcribe, options.sttConfig, data, saved, state);
+      state.parts.push(`[Telegram audio file]\n${saved.path}`);
+      return;
+    }
+    state.documentLines.push(
+      `- ${saved.filename}${saved.mimeType === undefined ? "" : ` (${saved.mimeType})`}: ${saved.path}`,
+    );
+  } catch (error) {
+    state.warnings.push(
+      formatAttachmentProcessingFailure(
+        attachment,
+        index,
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+  }
+}
+
 /**
  * Convert a raw Telegram message (text + attachments) into a unified format
  * consumable by the Pi agent.
@@ -131,105 +234,46 @@ async function loadAttachmentData(attachment: Attachment): Promise<Buffer> {
 export async function normalizeTelegramInput(
   options: NormalizeTelegramInputOptions,
 ): Promise<NormalizedTelegramInput> {
-  const parts: string[] = [];
-  const images: PiImageInput[] = [];
-  const savedFiles: SavedTelegramAttachment[] = [];
-  const warnings: string[] = [];
+  const state: AttachmentProcessingState = {
+    parts: [],
+    images: [],
+    savedFiles: [],
+    documentLines: [],
+    warnings: [],
+  };
   const text = options.message.text?.trim();
   const transcribe = options.transcribeAudio ?? defaultTranscribeAudio;
 
-  if (text) {
-    parts.push(text);
+  if (text !== undefined && text !== "") {
+    state.parts.push(text);
   }
 
   const rawSticker = options.message.raw?.sticker;
   if (rawSticker) {
-    parts.push(`[Telegram sticker: emoji=${rawSticker.emoji || "unknown"}]`);
+    state.parts.push(`[Telegram sticker: emoji=${rawSticker.emoji ?? "unknown"}]`);
   }
-
-  const documentLines: string[] = [];
 
   for (const [index, attachment] of (options.message.attachments ?? []).entries()) {
-    try {
-      const data = await loadAttachmentData(attachment);
-      const saved = await saveTelegramAttachment({
-        attachment: {
-          data,
-          fallbackFilename: fallbackFilename(attachment.type, index),
-          filename: attachment.name,
-          mimeType: attachment.mimeType,
-          type: attachmentType(attachment.type),
-        },
-        baseDir: options.baseDir,
-        messageId: options.message.id,
-        threadKey: options.threadKey,
-      });
-      savedFiles.push(saved);
-
-      if (attachment.type === "image") {
-        const mimeType = attachment.mimeType || "image/jpeg";
-        if (mimeType.startsWith("image/")) {
-          images.push({
-            type: "image",
-            data: data.toString("base64"),
-            mimeType,
-          });
-          parts.push(`[Telegram image: ${saved.path}]`);
-        } else {
-          warnings.push(`Image attachment ${saved.filename} did not include an image MIME type.`);
-          documentLines.push(
-            `- ${saved.filename}${saved.mimeType ? ` (${saved.mimeType})` : ""}: ${saved.path}`,
-          );
-        }
-        continue;
-      }
-
-      if (attachment.type === "audio") {
-        if (options.sttConfig.baseUrl) {
-          try {
-            const transcript = await transcribe({
-              config: options.sttConfig,
-              data,
-              filename: saved.filename,
-              mimeType: saved.mimeType,
-            });
-            if (transcript?.trim()) {
-              parts.push(`[Telegram voice transcript]\n${transcript.trim()}`);
-            }
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            warnings.push(`STT failed for ${saved.filename}: ${message}`);
-          }
-        }
-        parts.push(`[Telegram audio file]\n${saved.path}`);
-        continue;
-      }
-
-      documentLines.push(
-        `- ${saved.filename}${saved.mimeType ? ` (${saved.mimeType})` : ""}: ${saved.path}`,
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      warnings.push(formatAttachmentProcessingFailure(attachment, index, message));
-    }
+    await processAttachment(attachment, index, options, transcribe, state);
   }
 
-  if (documentLines.length > 0) {
-    parts.push(`[Telegram attachments]\n${documentLines.join("\n")}`);
+  if (state.documentLines.length > 0) {
+    state.parts.push(`[Telegram attachments]\n${state.documentLines.join("\n")}`);
   }
 
-  if (warnings.length > 0) {
-    parts.push(
-      `[Telegram input warnings]\n${warnings.map((warning) => `- ${warning}`).join("\n")}`,
+  if (state.warnings.length > 0) {
+    state.parts.push(
+      `[Telegram input warnings]\n${state.warnings.map((warning) => `- ${warning}`).join("\n")}`,
     );
   }
 
-  const normalizedText = parts.join("\n\n").trim();
+  const normalizedText = state.parts.join("\n\n").trim();
   return {
-    images,
-    isProcessable: normalizedText.length > 0 || images.length > 0 || savedFiles.length > 0,
-    savedFiles,
+    images: state.images,
+    isProcessable:
+      normalizedText.length > 0 || state.images.length > 0 || state.savedFiles.length > 0,
+    savedFiles: state.savedFiles,
     text: normalizedText,
-    warnings,
+    warnings: state.warnings,
   };
 }

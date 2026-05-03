@@ -43,11 +43,21 @@ export class ProfileWatcher {
       },
     });
 
-    this.watcher.on("add", (path) => this.scheduleReload(path));
-    this.watcher.on("addDir", (path) => this.scheduleReload(path));
-    this.watcher.on("change", (path) => this.scheduleReload(path));
-    this.watcher.on("unlink", (path) => this.scheduleReload(path));
-    this.watcher.on("unlinkDir", (path) => this.scheduleReload(path));
+    this.watcher.on("add", (path) => {
+      this.scheduleReload(path);
+    });
+    this.watcher.on("addDir", (path) => {
+      this.scheduleReload(path);
+    });
+    this.watcher.on("change", (path) => {
+      this.scheduleReload(path);
+    });
+    this.watcher.on("unlink", (path) => {
+      this.scheduleReload(path);
+    });
+    this.watcher.on("unlinkDir", (path) => {
+      this.scheduleReload(path);
+    });
     this.watcher.on("error", (error) => {
       console.error("[profile-watcher] watcher error", error);
     });
@@ -55,7 +65,7 @@ export class ProfileWatcher {
 
   private scheduleReload(path: string): void {
     if (classifyProfileChange(this.options.profileRoot, path) === "auth-or-model") {
-      if (this.authOrModelTimer) {
+      if (this.authOrModelTimer !== undefined) {
         clearTimeout(this.authOrModelTimer);
       }
       this.authOrModelTimer = setTimeout(() => {
@@ -66,7 +76,7 @@ export class ProfileWatcher {
       return;
     }
 
-    if (this.resourceTimer) {
+    if (this.resourceTimer !== undefined) {
       clearTimeout(this.resourceTimer);
     }
     this.resourceTimer = setTimeout(() => {
@@ -77,11 +87,11 @@ export class ProfileWatcher {
   }
 
   async dispose(): Promise<void> {
-    if (this.authOrModelTimer) {
+    if (this.authOrModelTimer !== undefined) {
       clearTimeout(this.authOrModelTimer);
       this.authOrModelTimer = undefined;
     }
-    if (this.resourceTimer) {
+    if (this.resourceTimer !== undefined) {
       clearTimeout(this.resourceTimer);
       this.resourceTimer = undefined;
     }

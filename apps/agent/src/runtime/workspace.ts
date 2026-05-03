@@ -16,6 +16,10 @@ async function ensureStateDir(): Promise<void> {
   await mkdir(dirname(stateFilePath), { recursive: true });
 }
 
+function isWorkspaceState(val: unknown): val is WorkspaceState {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
 async function loadState(): Promise<void> {
   if (loaded) {
     return;
@@ -23,7 +27,8 @@ async function loadState(): Promise<void> {
 
   try {
     const data = await readFile(stateFilePath, "utf-8");
-    state = JSON.parse(data) as WorkspaceState;
+    const parsed: unknown = JSON.parse(data);
+    state = isWorkspaceState(parsed) ? parsed : {};
   } catch {
     state = {};
   }
@@ -95,7 +100,7 @@ export async function setWorkspace(
     if (error instanceof Error && error.message.startsWith("Not a directory")) {
       throw error;
     }
-    throw new Error(`Directory not found: ${resolved}`);
+    throw new Error(`Directory not found: ${resolved}`, { cause: error });
   }
 
   state[threadId] = resolved;

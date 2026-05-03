@@ -28,7 +28,7 @@ export function normalizeCronJobInput(input: CronJobInput): AgentCronJob {
   }
 
   if (!Number.isInteger(input.chatId)) {
-    throw new Error("Cron job chatId must be an integer");
+    throw new TypeError("Cron job chatId must be an integer");
   }
 
   let condition: CronCondition | undefined;
@@ -41,7 +41,7 @@ export function normalizeCronJobInput(input: CronJobInput): AgentCronJob {
       input.condition.timeoutMs !== undefined &&
       (!Number.isInteger(input.condition.timeoutMs) || input.condition.timeoutMs <= 0)
     ) {
-      throw new Error("Cron job condition timeout must be a positive integer");
+      throw new TypeError("Cron job condition timeout must be a positive integer");
     }
     condition = {
       command,

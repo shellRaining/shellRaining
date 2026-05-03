@@ -5,5 +5,10 @@
     "suspicious": "warn",
     "pedantic": "warn"
   },
-  "ignorePatterns": ["dist/**", "node_modules/**"]
+  "rules": {
+    "typescript/prefer-readonly-parameter-types": "off",
+    "max-lines-per-function": "off",
+    "max-lines": "off"
+  },
+  "ignorePatterns": ["dist/**", "node_modules/**", "**/*.test.ts", "**/tests/**"]
 }

@@ -9,6 +9,7 @@ import { splitMessage } from "./runtime/message-splitter.js";
 import { injectPromptTimestampPrefix } from "./runtime/time-awareness.js";
 import {
   normalizeTelegramInput,
+  isTelegramInputMessage,
   type NormalizedTelegramInput,
   type TelegramInputMessage,
 } from "./runtime/telegram-input.js";
@@ -33,7 +34,7 @@ function parseCommand(
   messageText: string | null | undefined,
 ): { command: string; args: string } | null {
   const text = messageText?.trim();
-  if (!text?.startsWith("/")) {
+  if (text === undefined || text === null || !text.startsWith("/")) {
     return null;
   }
 
@@ -59,14 +60,23 @@ export interface BotRuntime {
   };
 }
 
+function extractErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
 /** Telegram's MarkdownV2 parser rejects malformed entities; fall back to plain text when that happens. */
 export function shouldFallbackToRawTelegramReply(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
   }
 
-  const typedError = error as Error & { code?: string };
-  return typedError.code === "VALIDATION_ERROR" && error.message.includes("can't parse entities");
+  return (
+    extractErrorCode(error) === "VALIDATION_ERROR" && error.message.includes("can't parse entities")
+  );
 }
 
 export function isTelegramInputProcessable(input: NormalizedTelegramInput): boolean {
@@ -82,7 +92,7 @@ export function formatTelegramStatusMessage(input: {
   threadId: string;
   workspace: string;
 }): string {
-  const telegramApi = input.telegramApiBaseUrl || "https://api.telegram.org";
+  const telegramApi = input.telegramApiBaseUrl ?? "https://api.telegram.org";
   return [
     `thread=${input.threadId}`,
     `workspace=${formatPath(input.workspace)}`,
@@ -95,7 +105,11 @@ export function formatTelegramStatusMessage(input: {
 }
 
 export function hasPotentialTelegramInput(message: TelegramInputMessage): boolean {
-  return Boolean(message.text?.trim() || message.attachments?.length || message.raw?.sticker);
+  return (
+    (message.text !== undefined && message.text !== null && message.text.trim() !== "") ||
+    (message.attachments !== undefined && message.attachments.length > 0) ||
+    (message.raw !== undefined && message.raw.sticker !== undefined)
+  );
 }
 
 /**
@@ -196,7 +210,7 @@ async function handleCommand(
         }
 
         const lines = sessions.slice(0, 10).map((session, index) => {
-          const title = session.name || session.firstMessage || "(empty)";
+          const title = session.name ?? session.firstMessage ?? "(empty)";
           return `${index + 1}. ${title.slice(0, 60)}\n${session.path}`;
         });
         await thread.post(
@@ -214,7 +228,7 @@ async function handleCommand(
       const sessions = await runtime.listSessions(scope, currentWorkspace);
       const index = Number.parseInt(match[1], 10) - 1;
       const target = sessions[index];
-      if (!target) {
+      if (target === undefined) {
         await thread.post("找不到对应编号的 session。");
         return true;
       }
@@ -223,9 +237,9 @@ async function handleCommand(
       await thread.post(switched ? `已切换到 session：${target.path}` : "session 切换被取消。");
       return true;
     }
-    case "status":
+    case "status": {
       const agent = config.agents[config.telegram.defaultAgent];
-      if (!agent) {
+      if (agent === undefined) {
         throw new Error(`Default agent is not configured: ${config.telegram.defaultAgent}`);
       }
       await thread.post(
@@ -240,6 +254,7 @@ async function handleCommand(
         }),
       );
       return true;
+    }
     default:
       return false;
   }
@@ -298,11 +313,11 @@ async function handlePrompt(
     },
   });
 
-  if (result.error) {
+  if (result.error !== undefined) {
     await thread.post(`执行失败：${result.error}`);
   }
 
-  if (result.text) {
+  if (result.text !== undefined && result.text !== "") {
     await replyLong(thread, result.text);
   }
 
@@ -348,7 +363,10 @@ export function createBot(
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
     }
-    await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
+    if (!isTelegramInputMessage(message)) {
+      return;
+    }
+    await handlePrompt(thread, message, config, runtime);
   });
 
   chat.onNewMention(async (thread, message) => {
@@ -361,7 +379,10 @@ export function createBot(
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
     }
-    await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
+    if (!isTelegramInputMessage(message)) {
+      return;
+    }
+    await handlePrompt(thread, message, config, runtime);
   });
 
   chat.onSubscribedMessage(async (thread, message) => {
@@ -373,7 +394,10 @@ export function createBot(
     if (await handleCommand(thread, message.text || "", config, runtime)) {
       return;
     }
-    await handlePrompt(thread, message as TelegramInputMessage, config, runtime);
+    if (!isTelegramInputMessage(message)) {
+      return;
+    }
+    await handlePrompt(thread, message, config, runtime);
   });
 
   return {

@@ -27,7 +27,7 @@ export function getShellRainingConfigPath(): { configured: boolean; path: string
   const configuredConfigPath = process.env.SHELL_RAINING_CONFIG?.trim();
   return {
     configured: Boolean(configuredConfigPath),
-    path: expandHome(configuredConfigPath || getConfigPath()),
+    path: expandHome(configuredConfigPath ?? getConfigPath()),
   };
 }
 
@@ -67,14 +67,15 @@ export function validateConfigFile(
 
 export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
   const token = resolveConfigValue(fileConfig.telegram?.botToken);
-  if (!token) {
+  if (token === undefined) {
     throw new Error("TELEGRAM_BOT_TOKEN is required. Set it in .env file.");
   }
 
   const home = homedir();
-  const baseDir = fileConfig.paths?.baseDir
-    ? expandHome(fileConfig.paths.baseDir, home)
-    : resolveDefaultBaseDir(home);
+  const baseDir =
+    fileConfig.paths?.baseDir === undefined
+      ? resolveDefaultBaseDir(home)
+      : expandHome(fileConfig.paths.baseDir, home);
   const workspace = resolveWorkspacePath(
     fileConfig.paths?.workspace ?? DEFAULT_WORKSPACE,
     baseDir,
@@ -85,27 +86,23 @@ export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
   const port = fileConfig.server?.port ?? 3457;
 
   return {
-    server: {
-      port,
-    },
+    server: { port },
     telegram: {
       botToken: token,
-      apiBaseUrl: fileConfig.telegram?.apiBaseUrl
-        ? trimTrailingSlashes(fileConfig.telegram.apiBaseUrl)
-        : undefined,
+      apiBaseUrl:
+        fileConfig.telegram?.apiBaseUrl === undefined
+          ? undefined
+          : trimTrailingSlashes(fileConfig.telegram.apiBaseUrl),
       webhookSecret: fileConfig.telegram?.webhookSecret,
       allowedUsers: fileConfig.telegram?.allowedUsers ?? [],
       defaultAgent,
       showThinking: fileConfig.telegram?.showThinking ?? false,
     },
-    paths: {
-      baseDir,
-      workspace,
-    },
+    paths: { baseDir, workspace },
     agents,
     cron: {
       jobsPath: expandHome(
-        resolveConfigValue(fileConfig.cron?.jobsPath) || getCronJobsPath(baseDir),
+        resolveConfigValue(fileConfig.cron?.jobsPath) ?? getCronJobsPath(baseDir),
         home,
       ),
       runTimeoutMs: fileConfig.cron?.runTimeoutMs ?? 5 * 60 * 1000,
@@ -113,7 +110,10 @@ export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
     },
     stt: {
       apiKey: fileConfig.stt?.apiKey,
-      baseUrl: fileConfig.stt?.baseUrl ? trimTrailingSlashes(fileConfig.stt.baseUrl) : undefined,
+      baseUrl:
+        fileConfig.stt?.baseUrl === undefined
+          ? undefined
+          : trimTrailingSlashes(fileConfig.stt.baseUrl),
       model: fileConfig.stt?.model,
     },
   };

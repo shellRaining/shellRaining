@@ -54,21 +54,18 @@ interface CachedSession {
 
 type RuntimeScopeInput = RuntimeScope | string;
 
-interface AssistantErrorMessage {
-  errorMessage?: unknown;
-  role?: unknown;
-  stopReason?: unknown;
-}
-
 function getAssistantErrorMessage(event: AgentSessionEvent): string | undefined {
   if (event.type !== "message_end" && event.type !== "turn_end") {
     return undefined;
   }
 
-  const message = event.message as AssistantErrorMessage;
+  const message = event.message;
   if (
+    !("role" in message) ||
     message.role !== "assistant" ||
+    !("stopReason" in message) ||
     message.stopReason !== "error" ||
+    !("errorMessage" in message) ||
     typeof message.errorMessage !== "string"
   ) {
     return undefined;
@@ -172,7 +169,7 @@ export class PiRuntime {
 
   private getAgentProfileRoot(agentId: string): string {
     const agent = this.config.agents[agentId];
-    if (!agent) {
+    if (agent === undefined) {
       throw new Error(`Agent is not configured: ${agentId}`);
     }
     return agent.profileRoot;
@@ -180,7 +177,7 @@ export class PiRuntime {
 
   private ensureProfileWatcher(agentId: string): void {
     const agent = this.config.agents[agentId];
-    if (!agent || this.profileWatchers.has(agent.piProfile)) {
+    if (agent === undefined || this.profileWatchers.has(agent.piProfile)) {
       return;
     }
 
@@ -188,7 +185,9 @@ export class PiRuntime {
       agent.piProfile,
       new ProfileWatcher({
         debounceMs: 500,
-        onAuthOrModelChange: (piProfile) => this.invalidateProfileSessions(piProfile),
+        onAuthOrModelChange: async (piProfile) => {
+          await this.invalidateProfileSessions(piProfile);
+        },
         onResourceChange: (piProfile) => this.reloadProfileResources(piProfile),
         piProfile: agent.piProfile,
         profileRoot: agent.profileRoot,
@@ -211,20 +210,20 @@ export class PiRuntime {
     return input;
   }
 
-  private async getOrCreateSession(scope: RuntimeScope, cwd: string): Promise<CachedSession> {
+  private getOrCreateSession(scope: RuntimeScope, cwd: string): Promise<CachedSession> {
     const scopeKey = getScopeKey(scope);
     const existing = this.sessions.get(scopeKey);
-    if (existing?.stale && !this.inflight.has(scopeKey)) {
+    if (existing?.stale === true && !this.inflight.has(scopeKey)) {
       existing.session.dispose();
       this.sessions.delete(scopeKey);
       return this.createSession(scope, cwd, "continue");
     }
 
-    if (existing && existing.cwd === cwd) {
-      return existing;
+    if (existing !== undefined && existing.cwd === cwd) {
+      return Promise.resolve(existing);
     }
 
-    if (existing && existing.cwd !== cwd) {
+    if (existing !== undefined && existing.cwd !== cwd) {
       existing.session.dispose();
       this.sessions.delete(scopeKey);
     }
@@ -245,6 +244,7 @@ export class PiRuntime {
   }
 
   async invalidateProfileSessions(piProfile: string): Promise<void> {
+    await Promise.resolve();
     const agentIds = this.getAgentIdsForProfile(piProfile);
     for (const [scopeKey, cached] of this.sessions) {
       if (!agentIds.has(cached.scope.agentId)) {
@@ -351,7 +351,7 @@ export class PiRuntime {
 
     const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
       const eventError = getAssistantErrorMessage(event);
-      if (eventError) {
+      if (eventError !== undefined) {
         assistantError = eventError;
       }
 
@@ -384,10 +384,12 @@ export class PiRuntime {
     try {
       await session.prompt(
         text,
-        callbacks.images?.length ? { images: callbacks.images } : undefined,
+        callbacks.images !== undefined && callbacks.images.length > 0
+          ? { images: callbacks.images }
+          : undefined,
       );
       const artifactsOutput = `${output}\n${toolOutput}`.trim();
-      if (assistantError) {
+      if (assistantError !== undefined) {
         return {
           artifactsOutput,
           error: assistantError,

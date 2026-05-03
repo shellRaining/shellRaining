@@ -23,10 +23,17 @@ function mergeConfigValue(target: unknown, source: unknown): unknown {
   return source;
 }
 
+function assertIsShellRainingConfigFile(value: unknown): asserts value is ShellRainingConfigFile {
+  if (!isPlainObject(value)) {
+    throw new Error("Expected merged config to be a plain object");
+  }
+}
+
 export function mergeConfigLayers(...configs: unknown[]): ShellRainingConfigFile {
   let merged: unknown = {};
   for (let index = configs.length - 1; index >= 0; index--) {
     merged = mergeConfigValue(merged, configs[index]);
   }
-  return merged as ShellRainingConfigFile;
+  assertIsShellRainingConfigFile(merged);
+  return merged;
 }

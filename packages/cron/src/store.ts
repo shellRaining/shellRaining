@@ -9,20 +9,41 @@ function createEmptyStore<TPayload, TOwner>(): CronStoreData<TPayload, TOwner> {
   };
 }
 
+function isCronStoreData<TPayload, TOwner>(
+  value: unknown,
+): value is CronStoreData<TPayload, TOwner> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "version" in value &&
+    (value as Record<string, unknown>).version === 1 &&
+    "jobs" in value &&
+    Array.isArray((value as Record<string, unknown>).jobs)
+  );
+}
+
+function parseStoreData<TPayload, TOwner>(raw: string): CronStoreData<TPayload, TOwner> {
+  const parsed: unknown = JSON.parse(raw);
+  if (isCronStoreData<TPayload, TOwner>(parsed)) {
+    return parsed;
+  }
+  return createEmptyStore<TPayload, TOwner>();
+}
+
 export class CronStore<TPayload = unknown, TOwner = unknown> {
   constructor(private readonly jobsPath: string) {}
 
   async load(): Promise<CronStoreData<TPayload, TOwner>> {
     try {
       const raw = await readFile(this.jobsPath, "utf8");
-      const parsed = JSON.parse(raw) as CronStoreData<TPayload, TOwner>;
-
-      return {
-        version: 1,
-        jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
-      };
+      return parseStoreData<TPayload, TOwner>(raw);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as Record<string, unknown>).code === "ENOENT"
+      ) {
         return createEmptyStore<TPayload, TOwner>();
       }
       throw error;

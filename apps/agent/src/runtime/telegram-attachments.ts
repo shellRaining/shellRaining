@@ -26,12 +26,12 @@ export interface SavedTelegramAttachment {
 }
 
 function safePathSegment(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "message";
+  return value.replaceAll(/[^a-zA-Z0-9._-]+/g, "_").replaceAll(/^_+|_+$/g, "") || "message";
 }
 
 function safeTelegramFilenameCandidate(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
-  if (!trimmed) {
+  if (trimmed === undefined || trimmed === "") {
     return undefined;
   }
 

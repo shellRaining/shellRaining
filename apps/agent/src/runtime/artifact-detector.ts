@@ -98,7 +98,7 @@ export async function detectNewFiles(
 }
 
 /** Capture the current file list and mtimes for later diffing via `detectNewFiles`. */
-export async function snapshotWorkspace(workspace: string): Promise<Map<string, number>> {
+export function snapshotWorkspace(workspace: string): Promise<Map<string, number>> {
   return getFileList(workspace);
 }
 

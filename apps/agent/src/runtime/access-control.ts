@@ -12,7 +12,7 @@ export function isUserAllowed(allowedUsers: number[], userId: string | undefined
     return true;
   }
 
-  if (!userId) {
+  if (userId === undefined || userId === "") {
     return false;
   }
 

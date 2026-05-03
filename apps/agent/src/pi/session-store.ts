@@ -17,7 +17,7 @@ export function getThreadIdFromKey(threadKey: string): string {
 
 export function getChatIdFromThreadKey(threadKey: string): number {
   const threadId = getThreadIdFromKey(threadKey);
-  const numeric = threadId.replace(/\D/g, "");
+  const numeric = threadId.replaceAll(/\D/g, "");
   return Number.parseInt(numeric, 10) || 0;
 }
 

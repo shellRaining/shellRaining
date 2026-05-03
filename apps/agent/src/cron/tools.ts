@@ -24,7 +24,9 @@ function formatSchedule(job: AgentCronJob): string {
     return `every ${job.schedule.everyMs}ms`;
   }
 
-  return job.schedule.tz ? `${job.schedule.expr} (${job.schedule.tz})` : job.schedule.expr;
+  return job.schedule.tz !== undefined && job.schedule.tz !== ""
+    ? `${job.schedule.expr} (${job.schedule.tz})`
+    : job.schedule.expr;
 }
 
 function formatJob(job: AgentCronJob): string {
@@ -46,7 +48,7 @@ export function buildCronExtensionFactory(
   service: CronService<AgentCronJob["payload"], AgentCronJob["owner"]>,
   thread: ThreadContext,
 ): ExtensionFactory {
-  return async (pi: ExtensionAPI) => {
+  return (pi: ExtensionAPI) => {
     pi.registerTool({
       name: "cron_create",
       label: "Create cron job",
@@ -104,7 +106,7 @@ export function buildCronExtensionFactory(
           return textResult("当前聊天没有定时任务。");
         }
 
-        return textResult(jobs.map(formatJob).join("\n\n"));
+        return textResult(jobs.map((job) => formatJob(job)).join("\n\n"));
       },
     });
 

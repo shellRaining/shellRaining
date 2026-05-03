@@ -22,16 +22,17 @@ loadEnv({ path: "../../.env" });
 // When running behind an HTTP proxy (e.g. in a container), undici needs explicit
 // global dispatcher setup — Node's built-in fetch doesn't respect *_PROXY env vars.
 if (
-  process.env.HTTP_PROXY ||
-  process.env.HTTPS_PROXY ||
-  process.env.http_proxy ||
-  process.env.https_proxy
+  process.env.HTTP_PROXY !== undefined ||
+  process.env.HTTPS_PROXY !== undefined ||
+  process.env.http_proxy !== undefined ||
+  process.env.https_proxy !== undefined
 ) {
-  const undici = (await import("undici")) as {
-    EnvHttpProxyAgent: new () => unknown;
-    setGlobalDispatcher: (dispatcher: unknown) => void;
-  };
-  undici.setGlobalDispatcher(new undici.EnvHttpProxyAgent());
+  const undici = await import("undici");
+  const EnvHttpProxyAgent = undici.EnvHttpProxyAgent;
+  const setGlobalDispatcher = undici.setGlobalDispatcher;
+  if (typeof setGlobalDispatcher === "function" && typeof EnvHttpProxyAgent === "function") {
+    setGlobalDispatcher(new EnvHttpProxyAgent());
+  }
 }
 
 const configService = await createConfigService();
@@ -63,7 +64,7 @@ function resolveCronPromptTimezone(job: AgentCronJob): string {
   }
 
   const timezone = job.schedule.tz?.trim();
-  return timezone || "UTC";
+  return timezone ?? "UTC";
 }
 
 function buildCronPromptText(job: AgentCronJob, nowMs: number): string {
@@ -112,11 +113,11 @@ const cronService = new CronService<AgentCronPayload, AgentCronOwner>({
       workspace,
     );
 
-    if (result.error) {
+    if (result.error !== undefined) {
       return { status: "error", error: result.error };
     }
 
-    await botRuntime.telegram.postCronMessage(job.owner.threadId, result.text || "(no output)");
+    await botRuntime.telegram.postCronMessage(job.owner.threadId, result.text ?? "(no output)");
     return { status: "success" };
   },
   async runCondition(condition, job) {
@@ -128,7 +129,9 @@ const cronService = new CronService<AgentCronPayload, AgentCronOwner>({
   },
   now: () => Date.now(),
   setTimeoutFn: (callback, delayMs) => setTimeout(callback, delayMs),
-  clearTimeoutFn: (handle) => clearTimeout(handle),
+  clearTimeoutFn: (handle) => {
+    clearTimeout(handle);
+  },
   runTimeoutMs: config.cron.runTimeoutMs,
   misfireGraceMs: config.cron.misfireGraceMs,
 });
@@ -167,7 +170,7 @@ const app = new Hono();
 
 app.get("/", (c) => c.text("shellRaining is running"));
 app.get("/health", (c) => c.json({ status: "ok" }));
-app.post("/webhook/telegram", async (c) => botRuntime.chat.webhooks.telegram(c.req.raw));
+app.post("/webhook/telegram", (c) => botRuntime.chat.webhooks.telegram(c.req.raw));
 
 serve({
   fetch: app.fetch,

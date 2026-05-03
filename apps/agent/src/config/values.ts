@@ -1,17 +1,17 @@
 /** Empty env/config strings mean "not configured" so lower-priority config can still apply. */
 export function resolveConfigValue(value: string | undefined): string | undefined {
-  if (!value) {
+  if (value === undefined || value === "") {
     return undefined;
   }
 
   const trimmed = value.trim();
-  return trimmed || undefined;
+  return trimmed === "" ? undefined : trimmed;
 }
 
 /** Invalid numeric env values are ignored instead of blocking startup with a bad override. */
 export function parseOptionalNumber(value: string | undefined): number | undefined {
   const resolved = resolveConfigValue(value);
-  if (!resolved) {
+  if (resolved === undefined) {
     return undefined;
   }
 
@@ -22,7 +22,7 @@ export function parseOptionalNumber(value: string | undefined): number | undefin
 /** Only explicit true/false strings override file/default config; other values are ignored. */
 export function parseOptionalBoolean(value: string | undefined): boolean | undefined {
   const resolved = resolveConfigValue(value);
-  if (!resolved) {
+  if (resolved === undefined) {
     return undefined;
   }
 
@@ -39,7 +39,7 @@ export function parseOptionalBoolean(value: string | undefined): boolean | undef
 /** Env allowlists are comma-separated because shell env values cannot represent arrays directly. */
 export function parseOptionalAllowedUsers(value: string | undefined): number[] | undefined {
   const resolved = resolveConfigValue(value);
-  if (!resolved) {
+  if (resolved === undefined) {
     return undefined;
   }
 
