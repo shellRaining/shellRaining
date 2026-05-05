@@ -10,6 +10,7 @@ function createConfig(): Config {
         aliases: [],
         displayName: "shellRaining",
         id: "default",
+        personaRoot: "/base/agents/default",
         piProfile: "default",
         profileRoot: "/base/pi-profiles/default",
       },

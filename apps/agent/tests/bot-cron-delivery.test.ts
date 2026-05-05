@@ -33,6 +33,7 @@ function createConfig() {
         aliases: [],
         displayName: "shellRaining",
         id: "default",
+        personaRoot: "/mock/base/agents/default",
         piProfile: "default",
         profileRoot: "/mock/agent",
       },
