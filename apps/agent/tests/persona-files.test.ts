@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const tempDirs: string[] = [];
 
@@ -71,6 +71,32 @@ describe("persona files", () => {
     await expect(loadAgentPersonaFiles(root)).resolves.toEqual([
       { name: "SOUL.md", path: join(root, "SOUL.md"), content: "small" },
     ]);
+  });
+
+  it("validates and closes the opened file handle before accepting content", async () => {
+    vi.resetModules();
+    const close = vi.fn(async () => undefined);
+    const readFile = vi.fn(async () => "unsafe\n");
+    const handleStat = vi.fn(async () => ({ isFile: () => false, size: 6 }));
+    const open = vi.fn(async () => ({ close, readFile, stat: handleStat }));
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return { ...actual, open };
+    });
+    try {
+      const { loadAgentPersonaFiles } = await import("../src/pi/persona-files.js");
+      const root = await createTempDir();
+      await writeFile(join(root, "IDENTITY.md"), "safe-at-lstat\n");
+
+      await expect(loadAgentPersonaFiles(root)).resolves.toEqual([]);
+      expect(open).toHaveBeenCalledWith(join(root, "IDENTITY.md"), "r");
+      expect(handleStat).toHaveBeenCalledTimes(1);
+      expect(readFile).not.toHaveBeenCalled();
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
   });
 
   it("returns watch paths for all persona files", async () => {

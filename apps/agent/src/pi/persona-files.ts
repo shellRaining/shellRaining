@@ -1,4 +1,4 @@
-import { lstat, readFile } from "node:fs/promises";
+import { lstat, open } from "node:fs/promises";
 import { join } from "node:path";
 
 export const PERSONA_FILE_NAMES = ["IDENTITY.md", "SOUL.md", "USER.md"] as const;
@@ -28,18 +28,25 @@ export async function loadAgentPersonaFiles(root: string): Promise<AgentPersonaF
       continue;
     }
 
-    let content;
+    let handle;
     try {
-      content = (await readFile(filePath, "utf-8")).trim();
+      handle = await open(filePath, "r");
+      const handleStats = await handle.stat();
+      if (!handleStats.isFile() || handleStats.size > MAX_PERSONA_FILE_BYTES) {
+        continue;
+      }
+
+      const content = (await handle.readFile({ encoding: "utf-8" })).trim();
+      if (!content) {
+        continue;
+      }
+
+      files.push({ name, path: filePath, content });
     } catch {
       continue;
+    } finally {
+      await handle?.close();
     }
-
-    if (!content) {
-      continue;
-    }
-
-    files.push({ name, path: filePath, content });
   }
 
   return files;
