@@ -48,6 +48,7 @@ interface PiRuntimeOptions {
 
 interface CachedSession {
   cwd: string;
+  personaPrompt: string;
   resourceLoader: DefaultResourceLoader;
   scope: RuntimeScope;
   sessionDir: string;
@@ -128,7 +129,7 @@ export class PiRuntime {
     const agent = this.getAgentConfig(scope.agentId);
     const profileRoot = agent.profileRoot;
     const personaFiles = await loadAgentPersonaFiles(agent.personaRoot);
-    const personaPrompt = buildAgentPersonaPrompt(personaFiles);
+    const promptState = { personaPrompt: buildAgentPersonaPrompt(personaFiles) };
     this.ensureProfileWatcher(scope.agentId);
     const sessionDir = await this.resolveSessionDir(scope, mode);
     await mkdir(sessionDir, { recursive: true });
@@ -143,7 +144,7 @@ export class PiRuntime {
       extensionFactories: this.options.extensionFactories?.(scope.threadKey),
       appendSystemPromptOverride: (base) => [
         ...base,
-        personaPrompt,
+        promptState.personaPrompt,
         buildShellRainingSystemPrompt({
           environmentName: "shellRaining",
           telegram: {
@@ -168,7 +169,20 @@ export class PiRuntime {
           : SessionManager.continueRecent(cwd, sessionDir),
     });
 
-    const cached = { cwd, resourceLoader, scope, session, sessionDir, stale: false };
+    const cached = {
+      cwd,
+      get personaPrompt() {
+        return promptState.personaPrompt;
+      },
+      set personaPrompt(value: string) {
+        promptState.personaPrompt = value;
+      },
+      resourceLoader,
+      scope,
+      session,
+      sessionDir,
+      stale: false,
+    };
     this.sessions.set(getScopeKey(scope), cached);
 
     this.logger.info(
@@ -296,6 +310,8 @@ export class PiRuntime {
       if (!agentIds.has(cached.scope.agentId)) {
         continue;
       }
+      const agent = this.getAgentConfig(cached.scope.agentId);
+      cached.personaPrompt = buildAgentPersonaPrompt(await loadAgentPersonaFiles(agent.personaRoot));
       const activeToolNames = cached.session.getActiveToolNames();
       await cached.resourceLoader.reload();
       cached.session.setActiveToolsByName(activeToolNames);

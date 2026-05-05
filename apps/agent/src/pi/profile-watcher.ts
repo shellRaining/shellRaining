@@ -18,12 +18,13 @@ type ChangeKind = "auth-or-model" | "resource";
 const RESOURCE_DIRS = ["skills", "extensions", "prompts", "themes"] as const;
 
 function getWatchedProfilePaths(profileRoot: string, resourceRoots: string[] = []): string[] {
+  const uniqueResourceRoots = [...new Set(resourceRoots)];
   return [
     join(profileRoot, "settings.json"),
     join(profileRoot, "models.json"),
     join(profileRoot, "auth.json"),
     ...RESOURCE_DIRS.map((dir) => join(profileRoot, dir)),
-    ...resourceRoots.flatMap((root) => getAgentPersonaWatchPaths(root)),
+    ...uniqueResourceRoots.flatMap((root) => getAgentPersonaWatchPaths(root)),
   ];
 }
 

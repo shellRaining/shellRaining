@@ -15,9 +15,11 @@ const sessionSetActiveToolsByName = vi.fn();
 const sessionManagerContinueRecent = vi.fn(() => ({ mode: "recent" }));
 const sessionManagerCreate = vi.fn(() => ({ mode: "new" }));
 const resourceLoaderReloads: ReturnType<typeof vi.fn>[] = [];
-const defaultResourceLoader = vi.fn(function DefaultResourceLoaderMock() {
+const resourceLoaderOptions: unknown[] = [];
+const defaultResourceLoader = vi.fn(function DefaultResourceLoaderMock(options: unknown) {
   const reload = vi.fn(async () => undefined);
   resourceLoaderReloads.push(reload);
+  resourceLoaderOptions.push(options);
   return {
     reload,
   };
@@ -142,6 +144,7 @@ describe("PiRuntime", () => {
     sessionManagerContinueRecent.mockReturnValue({ mode: "recent" });
     sessionManagerCreate.mockReturnValue({ mode: "new" });
     resourceLoaderReloads.length = 0;
+    resourceLoaderOptions.length = 0;
     sessionGetActiveToolNames.mockReturnValue(["read", "bash"]);
     sessionSetActiveToolsByName.mockReturnValue(undefined);
     authStorageCreate.mockReturnValue({ kind: "auth" });
@@ -436,6 +439,43 @@ describe("PiRuntime", () => {
     expect(watchedPaths).toContain(join(personaRoot, "IDENTITY.md"));
     expect(watchedPaths).toContain(join(personaRoot, "SOUL.md"));
     expect(watchedPaths).toContain(join(personaRoot, "USER.md"));
+    expect(resourceLoaderReloads[0]).toHaveBeenCalledTimes(2);
+    expect(createAgentSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes shared-profile persona prompt without recreating sessions", async () => {
+    const { mkdir, mkdtemp, writeFile } = await vi.importActual<
+      typeof import("node:fs/promises")
+    >("node:fs/promises");
+    const tempDir = await mkdtemp(join(tmpdir(), "pi-runtime-shared-persona-reload-"));
+    const personaRoot = join(tempDir, "agents", "coder");
+    await mkdir(personaRoot, { recursive: true });
+    await writeFile(join(personaRoot, "SOUL.md"), "old persona");
+    const config = createRuntimeConfig({
+      agents: {
+        ...createRuntimeConfig().agents,
+        coder: {
+          ...createRuntimeConfig().agents.coder,
+          personaRoot,
+          piProfile: "shared",
+          profileRoot: join(tempDir, "pi-profiles", "shared"),
+        },
+      },
+    });
+    const { createAgentSession } = await import("@mariozechner/pi-coding-agent");
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(config);
+
+    await runtime.prompt({ agentId: "coder", threadKey: "telegram__1" }, "hello", "/mock/workspace");
+    await writeFile(join(personaRoot, "SOUL.md"), "new persona");
+    await runtime.reloadProfileResources("shared");
+
+    const options = resourceLoaderOptions[0] as {
+      appendSystemPromptOverride?: (base: string[]) => string[];
+    };
+    const prompt = options.appendSystemPromptOverride?.(["base prompt"]).join("\n") ?? "";
+    expect(prompt).toContain("new persona");
+    expect(prompt).not.toContain("old persona");
     expect(resourceLoaderReloads[0]).toHaveBeenCalledTimes(2);
     expect(createAgentSession).toHaveBeenCalledTimes(1);
   });
