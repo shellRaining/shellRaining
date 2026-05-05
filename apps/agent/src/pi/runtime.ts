@@ -143,9 +143,9 @@ export class PiRuntime {
       extensionFactories: this.options.extensionFactories?.(scope.threadKey),
       appendSystemPromptOverride: (base) => [
         ...base,
+        personaPrompt,
         buildShellRainingSystemPrompt({
           environmentName: "shellRaining",
-          extraSections: [personaPrompt],
           telegram: {
             inboxDir: getTelegramInboxDisplayPath(),
             outputStyle: "chat",

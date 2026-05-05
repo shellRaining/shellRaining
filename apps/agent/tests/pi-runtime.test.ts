@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Config } from "../src/config/index.js";
 
 type SessionListener = (event: unknown) => void;
 
@@ -72,8 +73,8 @@ vi.mock("chokidar", () => ({
   },
 }));
 
-function createRuntimeConfig(overrides: Partial<ReturnType<typeof createRuntimeConfig>> = {}) {
-  const config = {
+function createRuntimeConfig(overrides: Partial<Config> = {}) {
+  const config: Config = {
     agents: {
       coder: {
         aliases: [],
@@ -475,10 +476,15 @@ describe("PiRuntime", () => {
       appendSystemPromptOverride?: (base: string[]) => string[];
     };
     const result = options.appendSystemPromptOverride?.(["base prompt"]);
+    const prompt = result?.join("\n") ?? "";
+    const personaIndex = prompt.indexOf("Speak like a pragmatic coding partner.");
+    const telegramOutputIndex = prompt.indexOf("Telegram output is a chat surface");
 
-    expect(result?.join("\n")).toContain("# Agent Persona Context");
-    expect(result?.join("\n")).toContain("## SOUL.md");
-    expect(result?.join("\n")).toContain("Speak like a pragmatic coding partner.");
+    expect(prompt).toContain("# Agent Persona Context");
+    expect(prompt).toContain("## SOUL.md");
+    expect(personaIndex).toBeGreaterThan(-1);
+    expect(telegramOutputIndex).toBeGreaterThan(-1);
+    expect(personaIndex).toBeLessThan(telegramOutputIndex);
   });
 
   it("captures showThinking from the config source at prompt start", async () => {
