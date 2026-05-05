@@ -90,6 +90,71 @@
         }
       }
     },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "anyOf": [
+            {
+              "const": "trace",
+              "type": "string"
+            },
+            {
+              "const": "debug",
+              "type": "string"
+            },
+            {
+              "const": "info",
+              "type": "string"
+            },
+            {
+              "const": "warn",
+              "type": "string"
+            },
+            {
+              "const": "error",
+              "type": "string"
+            },
+            {
+              "const": "fatal",
+              "type": "string"
+            }
+          ]
+        },
+        "file": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "path": {
+              "type": "string"
+            },
+            "frequency": {
+              "const": "daily",
+              "type": "string"
+            },
+            "limit": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "count": {
+                  "type": "number"
+                },
+                "removeOtherLogFiles": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "mkdir": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
     "stt": {
       "type": "object",
       "additionalProperties": false,

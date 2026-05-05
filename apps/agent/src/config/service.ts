@@ -1,4 +1,5 @@
 import { watchConfig } from "c12";
+import { createNoopLogger, type Logger } from "../logging/service.js";
 import { buildEffectiveConfig, classifyConfigChangePaths } from "./changes.js";
 import {
   createC12ConfigOptions,
@@ -32,10 +33,12 @@ type ConfigWatcher = {
 export class ConfigService {
   private effectiveConfig: Config;
   private listeners = new Set<ConfigListener>();
+  private readonly logger: Logger;
   private watcher?: ConfigWatcher;
 
-  constructor(initialConfig: Config) {
+  constructor(initialConfig: Config, logger: Logger = createNoopLogger()) {
     this.effectiveConfig = initialConfig;
+    this.logger = logger.child({ component: "config" });
   }
 
   current(): Config {
@@ -54,12 +57,14 @@ export class ConfigService {
       return;
     }
 
+    this.logger.info({ event: "config.watch.start" }, "config watcher starting");
     this.watcher = await watchConfig<ShellRainingConfigFile>({
       ...createC12ConfigOptions(),
       onUpdate: async (event: ConfigUpdateEvent) => {
         await this.handleUpdate(event);
       },
     });
+    this.logger.info({ event: "config.watch.ready" }, "config watcher started");
   }
 
   async stop(): Promise<void> {
@@ -70,6 +75,7 @@ export class ConfigService {
 
     this.watcher = undefined;
     await watcher.unwatch();
+    this.logger.info({ event: "config.watch.stop" }, "config watcher stopped");
   }
 
   private async handleUpdate(event: ConfigUpdateEvent): Promise<void> {
@@ -78,7 +84,7 @@ export class ConfigService {
       assertIsShellRainingConfigFile(event.newConfig.config);
       nextLoaded = resolveLoadedConfig(event.newConfig.config);
     } catch (error) {
-      console.error("[config-service] invalid watched config", error);
+      this.logger.error({ error, event: "config.reload.invalid" }, "invalid watched config");
       return;
     }
 
@@ -86,13 +92,18 @@ export class ConfigService {
       event.getDiff().map((entry) => diffEntryToPath(entry)),
     );
     if (classification.restartRequired.length > 0) {
-      console.error(
-        `[config-service] restart required for config paths: ${classification.restartRequired.join(", ")}`,
+      this.logger.warn(
+        {
+          event: "config.reload.restart_required",
+          restartRequiredPaths: classification.restartRequired,
+        },
+        "restart required for config paths",
       );
     }
     if (classification.unsupported.length > 0) {
-      console.error(
-        `[config-service] unsupported config paths changed: ${classification.unsupported.join(", ")}`,
+      this.logger.warn(
+        { event: "config.reload.unsupported", unsupportedPaths: classification.unsupported },
+        "unsupported config paths changed",
       );
     }
 
@@ -102,6 +113,10 @@ export class ConfigService {
     }
 
     this.effectiveConfig = nextEffective;
+    this.logger.info(
+      { event: "config.reload.applied", hotPaths: classification.hot },
+      "config reload applied",
+    );
     await Promise.all(
       [...this.listeners].map((listener) => Promise.resolve(listener(nextEffective))),
     );
@@ -116,6 +131,6 @@ function diffEntryToPath(entry: ConfigDiffEntry): string[] {
   return entry.key === undefined ? [] : entry.key.split(".");
 }
 
-export async function createConfigService(): Promise<ConfigService> {
-  return new ConfigService(resolveLoadedConfig(await loadShellRainingConfigFile()));
+export async function createConfigService(logger?: Logger): Promise<ConfigService> {
+  return new ConfigService(resolveLoadedConfig(await loadShellRainingConfigFile()), logger);
 }

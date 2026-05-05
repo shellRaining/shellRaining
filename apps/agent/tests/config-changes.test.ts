@@ -15,6 +15,18 @@ function createConfig(): Config {
       },
     },
     cron: { jobsPath: "/base/cron/jobs.json", misfireGraceMs: 300000, runTimeoutMs: 300000 },
+    logging: {
+      file: {
+        enabled: true,
+        frequency: "daily",
+        limit: {
+          count: 10,
+        },
+        mkdir: true,
+        path: "/base/logs/shellraining.log",
+      },
+      level: "info",
+    },
     paths: { baseDir: "/base", workspace: "/workspace" },
     server: { port: 3457 },
     stt: {},
@@ -84,6 +96,29 @@ describe("config changes", () => {
     });
   });
 
+  it("classifies logging config paths", () => {
+    expect(
+      classifyConfigChangePaths([
+        ["logging", "level"],
+        ["logging", "file", "enabled"],
+        ["logging", "file", "path"],
+        ["logging", "file", "frequency"],
+        ["logging", "file", "limit"],
+        ["logging", "file", "mkdir"],
+      ]),
+    ).toEqual({
+      hot: ["logging.level"],
+      restartRequired: [
+        "logging.file.enabled",
+        "logging.file.path",
+        "logging.file.frequency",
+        "logging.file.limit",
+        "logging.file.mkdir",
+      ],
+      unsupported: [],
+    });
+  });
+
   it("classifies unknown config paths as unsupported", () => {
     expect(
       classifyConfigChangePaths([
@@ -124,6 +159,18 @@ describe("config changes", () => {
     next.telegram.botToken = "next-token";
     next.server.port = 4567;
     next.paths.baseDir = "/next-base";
+    next.logging = {
+      file: {
+        enabled: false,
+        frequency: "daily",
+        limit: {
+          count: 20,
+        },
+        mkdir: false,
+        path: "/next/logs/shellraining.log",
+      },
+      level: "debug",
+    };
     next.stt = {
       apiKey: "next-api-key",
       baseUrl: "https://stt.example.com",
@@ -139,6 +186,8 @@ describe("config changes", () => {
         ["telegram", "botToken"],
         ["server", "port"],
         ["paths", "baseDir"],
+        ["logging", "level"],
+        ["logging", "file", "path"],
         ["stt", "apiKey"],
         ["stt", "baseUrl"],
         ["stt", "model"],
@@ -156,6 +205,8 @@ describe("config changes", () => {
     expect(effective.telegram.botToken).toBe("token");
     expect(effective.server.port).toBe(3457);
     expect(effective.paths.baseDir).toBe("/base");
+    expect(effective.logging.level).toBe("debug");
+    expect(effective.logging.file).toEqual(previous.logging.file);
   });
 
   it("applies stt object additions from parent change paths", () => {

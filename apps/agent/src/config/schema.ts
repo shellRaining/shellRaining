@@ -1,6 +1,9 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { DEFAULT_BASE_DIR, DEFAULT_WORKSPACE } from "./path.js";
 
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
+export type LogFileFrequency = "daily";
+
 /** Application configuration loaded from environment variables (or `.env` file). */
 export interface Config {
   server: {
@@ -36,6 +39,19 @@ export interface Config {
     runTimeoutMs: number;
     /** If a job missed its scheduled time by less than this window (ms), run it anyway. @defaultValue 300000 (5 min) */
     misfireGraceMs: number;
+  };
+  logging: {
+    level: LogLevel;
+    file: {
+      enabled: boolean;
+      path: string;
+      frequency: LogFileFrequency;
+      limit: {
+        count?: number;
+        removeOtherLogFiles?: boolean;
+      };
+      mkdir: boolean;
+    };
   };
   /** Speech-to-text (Whisper-compatible) configuration for transcribing voice messages. */
   stt: {
@@ -111,6 +127,43 @@ export const shellRainingConfigFileSchema = Type.Object(
         { additionalProperties: false },
       ),
     ),
+    logging: Type.Optional(
+      Type.Object(
+        {
+          level: Type.Optional(
+            Type.Union([
+              Type.Literal("trace"),
+              Type.Literal("debug"),
+              Type.Literal("info"),
+              Type.Literal("warn"),
+              Type.Literal("error"),
+              Type.Literal("fatal"),
+            ]),
+          ),
+          file: Type.Optional(
+            Type.Object(
+              {
+                enabled: Type.Optional(Type.Boolean()),
+                path: Type.Optional(Type.String()),
+                frequency: Type.Optional(Type.Literal("daily")),
+                limit: Type.Optional(
+                  Type.Object(
+                    {
+                      count: Type.Optional(Type.Number()),
+                      removeOtherLogFiles: Type.Optional(Type.Boolean()),
+                    },
+                    { additionalProperties: false },
+                  ),
+                ),
+                mkdir: Type.Optional(Type.Boolean()),
+              },
+              { additionalProperties: false },
+            ),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     stt: Type.Optional(
       Type.Object(
         {
@@ -135,6 +188,17 @@ export const shellRainingConfigDefaults: ShellRainingConfigFile = {
   cron: {
     misfireGraceMs: 5 * 60 * 1000,
     runTimeoutMs: 5 * 60 * 1000,
+  },
+  logging: {
+    file: {
+      enabled: true,
+      frequency: "daily",
+      limit: {
+        count: 10,
+      },
+      mkdir: true,
+    },
+    level: "info",
   },
   paths: {
     baseDir: DEFAULT_BASE_DIR,

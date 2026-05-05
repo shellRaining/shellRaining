@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { Value } from "@sinclair/typebox/value";
 import { loadConfig as loadC12Config, type LoadConfigOptions } from "c12";
 import { resolveAgents, resolveDefaultAgent } from "./agents.js";
@@ -84,6 +84,10 @@ export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
   const agents = resolveAgents(fileConfig.agents, baseDir);
   const defaultAgent = resolveDefaultAgent(fileConfig.telegram?.defaultAgent, agents);
   const port = fileConfig.server?.port ?? 3457;
+  const loggingFilePath = expandHome(
+    resolveConfigValue(fileConfig.logging?.file?.path) ?? join(baseDir, "logs", "shellraining.log"),
+    home,
+  );
 
   return {
     server: { port },
@@ -107,6 +111,16 @@ export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
       ),
       runTimeoutMs: fileConfig.cron?.runTimeoutMs ?? 5 * 60 * 1000,
       misfireGraceMs: fileConfig.cron?.misfireGraceMs ?? 5 * 60 * 1000,
+    },
+    logging: {
+      file: {
+        enabled: fileConfig.logging?.file?.enabled ?? true,
+        frequency: fileConfig.logging?.file?.frequency ?? "daily",
+        limit: fileConfig.logging?.file?.limit ?? { count: 10 },
+        mkdir: fileConfig.logging?.file?.mkdir ?? true,
+        path: loggingFilePath,
+      },
+      level: fileConfig.logging?.level ?? "info",
     },
     stt: {
       apiKey: fileConfig.stt?.apiKey,

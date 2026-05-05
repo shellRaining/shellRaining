@@ -9,6 +9,7 @@ export interface ConfigChangeClassification {
 const hotConfigPaths = new Set([
   "telegram.allowedUsers",
   "telegram.showThinking",
+  "logging.level",
   "stt.apiKey",
   "stt.baseUrl",
   "stt.model",
@@ -28,6 +29,11 @@ const restartRequiredConfigPaths = new Set([
   "cron.jobsPath",
   "cron.runTimeoutMs",
   "cron.misfireGraceMs",
+  "logging.file.enabled",
+  "logging.file.path",
+  "logging.file.frequency",
+  "logging.file.limit",
+  "logging.file.mkdir",
 ]);
 
 export function classifyConfigChangePaths(
@@ -90,6 +96,7 @@ export function buildEffectiveConfig(
       ]),
     ),
     cron: { ...previous.cron },
+    logging: { ...previous.logging, file: { ...previous.logging.file } },
     paths: { ...previous.paths },
     server: { ...previous.server },
     stt: { ...previous.stt },
@@ -101,6 +108,8 @@ export function buildEffectiveConfig(
       effective.telegram.allowedUsers = [...next.telegram.allowedUsers];
     } else if (key === "telegram.showThinking") {
       effective.telegram.showThinking = next.telegram.showThinking;
+    } else if (key === "logging.level") {
+      effective.logging.level = next.logging.level;
     } else if (key === "stt.apiKey") {
       effective.stt.apiKey = next.stt.apiKey;
     } else if (key === "stt.baseUrl") {

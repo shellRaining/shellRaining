@@ -78,6 +78,18 @@ describe("config", () => {
     const config = await loadConfig();
     expect(config.paths.workspace).toBe("/mock/home/.shellRaining/shellRaining-workspace");
     expect(config.paths.baseDir).toBe("/mock/home/.shellRaining");
+    expect(config.logging).toEqual({
+      file: {
+        enabled: true,
+        frequency: "daily",
+        limit: {
+          count: 10,
+        },
+        mkdir: true,
+        path: "/mock/home/.shellRaining/logs/shellraining.log",
+      },
+      level: "info",
+    });
     expect(config.telegram.defaultAgent).toBe("default");
     expect(config.agents).toEqual({
       default: {
@@ -312,6 +324,18 @@ describe("config", () => {
           runTimeoutMs: 1000,
           misfireGraceMs: 2000,
         },
+        logging: {
+          level: "debug",
+          file: {
+            enabled: true,
+            path: "~/logs/shellraining.log",
+            frequency: "daily",
+            limit: {
+              count: 20,
+            },
+            mkdir: false,
+          },
+        },
         stt: {
           apiKey: "stt-key",
           baseUrl: "https://stt.example.com/",
@@ -336,6 +360,18 @@ describe("config", () => {
     expect(config.cron.jobsPath).toBe("/mock/home/.shellRaining/cron/jobs.json");
     expect(config.cron.runTimeoutMs).toBe(1000);
     expect(config.cron.misfireGraceMs).toBe(2000);
+    expect(config.logging).toEqual({
+      file: {
+        enabled: true,
+        frequency: "daily",
+        limit: {
+          count: 20,
+        },
+        mkdir: false,
+        path: "/mock/home/logs/shellraining.log",
+      },
+      level: "debug",
+    });
     expect(config.stt).toEqual({
       apiKey: "stt-key",
       baseUrl: "https://stt.example.com",

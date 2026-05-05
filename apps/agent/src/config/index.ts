@@ -1,7 +1,13 @@
 import { loadShellRainingConfigFile, resolveConfig } from "./loader.js";
 import type { Config } from "./schema.js";
 
-export type { Config, ResolvedAgentConfig, ShellRainingConfigFile } from "./schema.js";
+export type {
+  Config,
+  LogFileFrequency,
+  LogLevel,
+  ResolvedAgentConfig,
+  ShellRainingConfigFile,
+} from "./schema.js";
 export { shellRainingConfigFileSchema } from "./schema.js";
 export { buildEffectiveConfig, classifyConfigChangePaths } from "./changes.js";
 export type { ConfigChangeClassification } from "./changes.js";

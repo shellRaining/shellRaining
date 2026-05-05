@@ -42,6 +42,18 @@ function createConfig() {
       misfireGraceMs: 5 * 60 * 1000,
       runTimeoutMs: 5 * 60 * 1000,
     },
+    logging: {
+      file: {
+        enabled: true,
+        frequency: "daily" as const,
+        limit: {
+          count: 10,
+        },
+        mkdir: true,
+        path: "/mock/base/logs/shellraining.log",
+      },
+      level: "info" as const,
+    },
     paths: {
       baseDir: "/mock/base",
       workspace: "/mock/workspace",

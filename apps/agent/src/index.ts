@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { config as loadEnv } from "dotenv";
 import { createBot } from "./bot.js";
-import { createConfigService } from "./config/index.js";
+import { ConfigService, loadConfig } from "./config/index.js";
 import { ExecaError, execa } from "execa";
 import {
   CronService,
@@ -12,6 +12,7 @@ import {
 } from "@shellraining/cron";
 import { buildCronExtensionFactory } from "./cron/tools.js";
 import type { AgentCronJob, AgentCronOwner, AgentCronPayload } from "./cron/types.js";
+import { createLogService } from "./logging/service.js";
 import { PiRuntime } from "./pi/runtime.js";
 import { getThreadIdFromKey, getChatIdFromThreadKey } from "./pi/session-store.js";
 import { appendCurrentTimeLine } from "./runtime/time-awareness.js";
@@ -35,8 +36,15 @@ if (
   }
 }
 
-const configService = await createConfigService();
+const initialConfig = await loadConfig();
+const logService = createLogService(initialConfig.logging);
+const logger = logService.child({ component: "app" });
+logger.info({ event: "app.start" }, "shellRaining starting");
+const configService = new ConfigService(initialConfig, logService.child({ component: "config" }));
 await configService.start();
+configService.subscribe((nextConfig) => {
+  logService.setLevel(nextConfig.logging.level);
+});
 const config = configService.current();
 const currentConfig = () => configService.current();
 const cronStore = new CronStore<AgentCronPayload, AgentCronOwner>(config.cron.jobsPath);
@@ -82,17 +90,54 @@ async function runCronCondition(
   condition: CronCondition,
   job: AgentCronJob,
 ): Promise<CronConditionResult> {
+  const startedAt = Date.now();
+  logger.info(
+    { event: "cron.condition.start", jobId: job.id, threadKey: job.owner.threadKey },
+    "cron condition started",
+  );
   const workspace = await getWorkspace(job.owner.threadKey, config.paths.workspace);
   const result = await execCommand(condition.command, workspace, condition.timeoutMs ?? 30_000);
 
   if (result.exitCode === 0) {
+    logger.info(
+      {
+        durationMs: Date.now() - startedAt,
+        event: "cron.condition.finish",
+        jobId: job.id,
+        status: "pass",
+        threadKey: job.owner.threadKey,
+      },
+      "cron condition passed",
+    );
     return { status: "pass" };
   }
 
   if (result.exitCode === 1) {
+    logger.info(
+      {
+        durationMs: Date.now() - startedAt,
+        event: "cron.condition.finish",
+        jobId: job.id,
+        status: "skip",
+        threadKey: job.owner.threadKey,
+      },
+      "cron condition skipped",
+    );
     return { status: "skip" };
   }
 
+  logger.warn(
+    {
+      durationMs: Date.now() - startedAt,
+      event: "cron.condition.finish",
+      exitCode: result.exitCode,
+      jobId: job.id,
+      signal: result.signal,
+      status: "error",
+      threadKey: job.owner.threadKey,
+    },
+    "cron condition failed",
+  );
   return {
     status: "error",
     error: result.signal
@@ -105,6 +150,11 @@ let runtime: PiRuntime;
 const cronService = new CronService<AgentCronPayload, AgentCronOwner>({
   store: cronStore,
   async execute(job, nowMs) {
+    const startedAt = Date.now();
+    logger.info(
+      { event: "cron.execute.start", jobId: job.id, threadKey: job.owner.threadKey },
+      "cron job execution started",
+    );
     const workspace = await getWorkspace(job.owner.threadKey, config.paths.workspace);
     const promptText = buildCronPromptText(job, nowMs);
     const result = await runtime.prompt(
@@ -114,16 +164,40 @@ const cronService = new CronService<AgentCronPayload, AgentCronOwner>({
     );
 
     if (result.error !== undefined) {
+      logger.error(
+        {
+          durationMs: Date.now() - startedAt,
+          event: "cron.execute.finish",
+          jobId: job.id,
+          status: "error",
+          threadKey: job.owner.threadKey,
+        },
+        "cron job execution failed",
+      );
       return { status: "error", error: result.error };
     }
 
     await botRuntime.telegram.postCronMessage(job.owner.threadId, result.text ?? "(no output)");
+    logger.info(
+      {
+        durationMs: Date.now() - startedAt,
+        event: "cron.execute.finish",
+        jobId: job.id,
+        status: "success",
+        threadKey: job.owner.threadKey,
+      },
+      "cron job execution finished",
+    );
     return { status: "success" };
   },
   async runCondition(condition, job) {
     try {
       return await runCronCondition(condition, job);
     } catch (error) {
+      logger.error(
+        { error, event: "cron.condition.error", jobId: job.id, threadKey: job.owner.threadKey },
+        "cron condition threw an error",
+      );
       return { status: "error", error: error instanceof Error ? error.message : String(error) };
     }
   },
@@ -141,8 +215,9 @@ runtime = new PiRuntime(currentConfig, {
     const chatId = getChatIdFromThreadKey(threadKey);
     return [buildCronExtensionFactory(cronService, { chatId, threadId, threadKey })];
   },
+  logger: logService.child({ component: "pi-runtime" }),
 });
-const botRuntime = createBot(currentConfig, runtime);
+const botRuntime = createBot(currentConfig, runtime, logService.child({ component: "bot" }));
 
 let shuttingDown = false;
 
@@ -151,9 +226,10 @@ async function shutdown(signal: string) {
     return;
   }
   shuttingDown = true;
-  console.error(`[shellRaining] shutting down on ${signal}`);
+  logger.info({ event: "app.shutdown", signal }, "shutting down");
   await configService.stop();
   await runtime.dispose();
+  await logService.stop();
   process.exit(0);
 }
 
@@ -166,6 +242,7 @@ process.on("SIGTERM", () => {
 });
 
 await cronService.start();
+logger.info({ event: "cron.start" }, "cron service started");
 const app = new Hono();
 
 app.get("/", (c) => c.text("shellRaining is running"));
@@ -176,3 +253,4 @@ serve({
   fetch: app.fetch,
   port: config.server.port,
 });
+logger.info({ event: "http.listen", port: config.server.port }, "HTTP server listening");
