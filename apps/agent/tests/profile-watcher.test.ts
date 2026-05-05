@@ -67,10 +67,42 @@ describe("ProfileWatcher", () => {
       "/base/pi-profiles/shared/extensions",
       "/base/pi-profiles/shared/prompts",
       "/base/pi-profiles/shared/themes",
+      "/base/agents/coder",
       "/base/agents/coder/IDENTITY.md",
       "/base/agents/coder/SOUL.md",
       "/base/agents/coder/USER.md",
     ]);
+  });
+
+  it("treats agent persona root and files as resource changes", async () => {
+    const handlers = new Map<string, (path: string) => void>();
+    on.mockImplementation((event, handler) => {
+      handlers.set(event, handler);
+      return { close, on };
+    });
+    const onResourceChange = vi.fn(async () => undefined);
+    const onAuthOrModelChange = vi.fn(async () => undefined);
+    const { ProfileWatcher } = await import("../src/pi/profile-watcher.js");
+    new ProfileWatcher({
+      debounceMs: 10,
+      onAuthOrModelChange,
+      onResourceChange,
+      piProfile: "shared",
+      profileRoot: "/base/pi-profiles/shared",
+      resourceRoots: ["/base/agents/coder"],
+    });
+
+    handlers.get("addDir")?.("/base/agents/coder");
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(onResourceChange).toHaveBeenCalledWith("shared");
+    expect(onAuthOrModelChange).not.toHaveBeenCalled();
+
+    handlers.get("add")?.("/base/agents/coder/SOUL.md");
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(onResourceChange).toHaveBeenCalledTimes(2);
+    expect(onAuthOrModelChange).not.toHaveBeenCalled();
   });
 
   it("deduplicates watched agent persona resource roots", async () => {

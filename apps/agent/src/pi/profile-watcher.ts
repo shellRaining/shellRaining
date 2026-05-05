@@ -24,7 +24,7 @@ function getWatchedProfilePaths(profileRoot: string, resourceRoots: string[] = [
     join(profileRoot, "models.json"),
     join(profileRoot, "auth.json"),
     ...RESOURCE_DIRS.map((dir) => join(profileRoot, dir)),
-    ...uniqueResourceRoots.flatMap((root) => getAgentPersonaWatchPaths(root)),
+    ...uniqueResourceRoots.flatMap((root) => [root, ...getAgentPersonaWatchPaths(root)]),
   ];
 }
 
