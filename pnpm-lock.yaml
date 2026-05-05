@@ -53,9 +53,6 @@ importers:
       '@shellraining/cron':
         specifier: workspace:*
         version: link:../../packages/cron
-      '@shellraining/system-prompt':
-        specifier: workspace:*
-        version: link:../../packages/system-prompt
       '@sinclair/typebox':
         specifier: ^0.34.41
         version: 0.34.49
