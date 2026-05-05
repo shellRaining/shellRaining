@@ -78,7 +78,9 @@ export function buildAgentPersonaPrompt(files: AgentPersonaFile[]): string {
   ];
 
   if (files.some((file) => file.name === "SOUL.md")) {
-    lines.push("If SOUL.md is present, embody its persona and tone while preserving factual accuracy and task focus.");
+    lines.push(
+      "If SOUL.md is present, embody its persona and tone while preserving factual accuracy and task focus.",
+    );
   }
 
   for (const file of files) {

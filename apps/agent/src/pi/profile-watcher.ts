@@ -43,13 +43,16 @@ export class ProfileWatcher {
 
   constructor(private readonly options: ProfileWatcherOptions) {
     this.logger = (options.logger ?? createNoopLogger()).child({ component: "profile-watcher" });
-    this.watcher = chokidar.watch(getWatchedProfilePaths(options.profileRoot, options.resourceRoots), {
-      ignoreInitial: true,
-      awaitWriteFinish: {
-        stabilityThreshold: 200,
-        pollInterval: 50,
+    this.watcher = chokidar.watch(
+      getWatchedProfilePaths(options.profileRoot, options.resourceRoots),
+      {
+        ignoreInitial: true,
+        awaitWriteFinish: {
+          stabilityThreshold: 200,
+          pollInterval: 50,
+        },
       },
-    });
+    );
 
     this.watcher.on("add", (path) => {
       this.scheduleReload(path);

@@ -90,7 +90,10 @@ describe("persona files", () => {
       await writeFile(join(root, "IDENTITY.md"), "safe-at-lstat\n");
 
       await expect(loadAgentPersonaFiles(root)).resolves.toEqual([]);
-      expect(open).toHaveBeenCalledWith(join(root, "IDENTITY.md"), constants.O_RDONLY | constants.O_NOFOLLOW);
+      expect(open).toHaveBeenCalledWith(
+        join(root, "IDENTITY.md"),
+        constants.O_RDONLY | constants.O_NOFOLLOW,
+      );
       expect(handleStat).toHaveBeenCalledTimes(1);
       expect(read).not.toHaveBeenCalled();
       expect(close).toHaveBeenCalledTimes(1);
@@ -116,7 +119,10 @@ describe("persona files", () => {
       await writeFile(join(root, "IDENTITY.md"), "safe\n");
 
       await expect(loadAgentPersonaFiles(root)).resolves.toEqual([]);
-      expect(open).toHaveBeenCalledWith(join(root, "IDENTITY.md"), constants.O_RDONLY | constants.O_NOFOLLOW);
+      expect(open).toHaveBeenCalledWith(
+        join(root, "IDENTITY.md"),
+        constants.O_RDONLY | constants.O_NOFOLLOW,
+      );
       expect(read).toHaveBeenCalledTimes(1);
       expect(read.mock.calls[0]?.[0]).toHaveLength(256 * 1024 + 1);
       expect(close).toHaveBeenCalledTimes(1);

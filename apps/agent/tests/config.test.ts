@@ -184,7 +184,9 @@ describe("config", () => {
     const config = await loadConfig();
 
     expect(config.agents.coder?.profileRoot).toBe(join(tempDir, "base", "pi-profiles", "shared"));
-    expect(config.agents.reviewer?.profileRoot).toBe(join(tempDir, "base", "pi-profiles", "shared"));
+    expect(config.agents.reviewer?.profileRoot).toBe(
+      join(tempDir, "base", "pi-profiles", "shared"),
+    );
     expect(config.agents.coder?.personaRoot).toBe(join(tempDir, "base", "agents", "coder"));
     expect(config.agents.reviewer?.personaRoot).toBe(join(tempDir, "base", "agents", "reviewer"));
   });

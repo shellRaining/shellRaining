@@ -311,7 +311,9 @@ export class PiRuntime {
         continue;
       }
       const agent = this.getAgentConfig(cached.scope.agentId);
-      cached.personaPrompt = buildAgentPersonaPrompt(await loadAgentPersonaFiles(agent.personaRoot));
+      cached.personaPrompt = buildAgentPersonaPrompt(
+        await loadAgentPersonaFiles(agent.personaRoot),
+      );
       const activeToolNames = cached.session.getActiveToolNames();
       await cached.resourceLoader.reload();
       cached.session.setActiveToolsByName(activeToolNames);

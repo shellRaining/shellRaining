@@ -433,7 +433,11 @@ describe("PiRuntime", () => {
     const { PiRuntime } = await import("../src/pi/runtime.js");
     const runtime = new PiRuntime(config);
 
-    await runtime.prompt({ agentId: "coder", threadKey: "telegram__1" }, "hello", "/mock/workspace");
+    await runtime.prompt(
+      { agentId: "coder", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
     await runtime.reloadProfileResources("shared");
 
     expect(watchedPaths).toContain(join(personaRoot, "IDENTITY.md"));
@@ -444,9 +448,8 @@ describe("PiRuntime", () => {
   });
 
   it("refreshes shared-profile persona prompt without recreating sessions", async () => {
-    const { mkdir, mkdtemp, writeFile } = await vi.importActual<
-      typeof import("node:fs/promises")
-    >("node:fs/promises");
+    const { mkdir, mkdtemp, writeFile } =
+      await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
     const tempDir = await mkdtemp(join(tmpdir(), "pi-runtime-shared-persona-reload-"));
     const personaRoot = join(tempDir, "agents", "coder");
     await mkdir(personaRoot, { recursive: true });
@@ -466,7 +469,11 @@ describe("PiRuntime", () => {
     const { PiRuntime } = await import("../src/pi/runtime.js");
     const runtime = new PiRuntime(config);
 
-    await runtime.prompt({ agentId: "coder", threadKey: "telegram__1" }, "hello", "/mock/workspace");
+    await runtime.prompt(
+      { agentId: "coder", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
     await writeFile(join(personaRoot, "SOUL.md"), "new persona");
     await runtime.reloadProfileResources("shared");
 
@@ -520,9 +527,8 @@ describe("PiRuntime", () => {
   });
 
   it("appends agent persona files to the shellRaining system prompt", async () => {
-    const { mkdir, mkdtemp, writeFile } = await vi.importActual<
-      typeof import("node:fs/promises")
-    >("node:fs/promises");
+    const { mkdir, mkdtemp, writeFile } =
+      await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
     const tempDir = await mkdtemp(join(tmpdir(), "pi-runtime-"));
     const personaRoot = join(tempDir, "agents", "coder");
     await mkdir(personaRoot, { recursive: true });
@@ -544,7 +550,11 @@ describe("PiRuntime", () => {
     const { PiRuntime } = await import("../src/pi/runtime.js");
     const runtime = new PiRuntime(config);
 
-    await runtime.prompt({ agentId: "coder", threadKey: "telegram__1" }, "hello", "/mock/workspace");
+    await runtime.prompt(
+      { agentId: "coder", threadKey: "telegram__1" },
+      "hello",
+      "/mock/workspace",
+    );
 
     const options = defaultResourceLoader.mock.calls.at(0)?.at(0) as unknown as {
       appendSystemPromptOverride?: (base: string[]) => string[];

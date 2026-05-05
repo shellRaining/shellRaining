@@ -86,7 +86,9 @@ describe("ProfileWatcher", () => {
       resourceRoots: ["/base/agents/coder", "/base/agents/coder"],
     });
 
-    expect(watchedPaths.filter((path) => path === "/base/agents/coder/IDENTITY.md")).toHaveLength(1);
+    expect(watchedPaths.filter((path) => path === "/base/agents/coder/IDENTITY.md")).toHaveLength(
+      1,
+    );
     expect(watchedPaths.filter((path) => path === "/base/agents/coder/SOUL.md")).toHaveLength(1);
     expect(watchedPaths.filter((path) => path === "/base/agents/coder/USER.md")).toHaveLength(1);
   });
