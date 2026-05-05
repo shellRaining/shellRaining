@@ -213,6 +213,9 @@ export class PiRuntime {
     if (agent === undefined || this.profileWatchers.has(agent.piProfile)) {
       return;
     }
+    const resourceRoots = Object.values(this.config.agents)
+      .filter((candidate) => candidate.piProfile === agent.piProfile)
+      .map((candidate) => candidate.personaRoot);
 
     this.profileWatchers.set(
       agent.piProfile,
@@ -225,6 +228,7 @@ export class PiRuntime {
         logger: this.logger,
         piProfile: agent.piProfile,
         profileRoot: agent.profileRoot,
+        resourceRoots,
       }),
     );
   }

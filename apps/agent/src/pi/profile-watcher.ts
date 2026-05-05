@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
 import { createNoopLogger, type Logger } from "../logging/service.js";
+import { getAgentPersonaWatchPaths } from "./persona-files.js";
 
 interface ProfileWatcherOptions {
   debounceMs: number;
@@ -9,18 +10,20 @@ interface ProfileWatcherOptions {
   onResourceChange: (piProfile: string) => Promise<void>;
   piProfile: string;
   profileRoot: string;
+  resourceRoots?: string[];
 }
 
 type ChangeKind = "auth-or-model" | "resource";
 
 const RESOURCE_DIRS = ["skills", "extensions", "prompts", "themes"] as const;
 
-function getWatchedProfilePaths(profileRoot: string): string[] {
+function getWatchedProfilePaths(profileRoot: string, resourceRoots: string[] = []): string[] {
   return [
     join(profileRoot, "settings.json"),
     join(profileRoot, "models.json"),
     join(profileRoot, "auth.json"),
     ...RESOURCE_DIRS.map((dir) => join(profileRoot, dir)),
+    ...resourceRoots.flatMap((root) => getAgentPersonaWatchPaths(root)),
   ];
 }
 
@@ -39,7 +42,7 @@ export class ProfileWatcher {
 
   constructor(private readonly options: ProfileWatcherOptions) {
     this.logger = (options.logger ?? createNoopLogger()).child({ component: "profile-watcher" });
-    this.watcher = chokidar.watch(getWatchedProfilePaths(options.profileRoot), {
+    this.watcher = chokidar.watch(getWatchedProfilePaths(options.profileRoot, options.resourceRoots), {
       ignoreInitial: true,
       awaitWriteFinish: {
         stabilityThreshold: 200,

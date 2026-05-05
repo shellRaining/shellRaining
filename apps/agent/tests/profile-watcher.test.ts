@@ -46,6 +46,33 @@ describe("ProfileWatcher", () => {
     ]);
   });
 
+  it("watches agent persona files for shared profile resources", async () => {
+    const { createNoopLogger } = await import("../src/logging/service.js");
+    const { ProfileWatcher } = await import("../src/pi/profile-watcher.js");
+    new ProfileWatcher({
+      debounceMs: 10,
+      logger: createNoopLogger(),
+      onAuthOrModelChange: async () => undefined,
+      onResourceChange: async () => undefined,
+      piProfile: "shared",
+      profileRoot: "/base/pi-profiles/shared",
+      resourceRoots: ["/base/agents/coder"],
+    });
+
+    expect(watchedPaths).toEqual([
+      "/base/pi-profiles/shared/settings.json",
+      "/base/pi-profiles/shared/models.json",
+      "/base/pi-profiles/shared/auth.json",
+      "/base/pi-profiles/shared/skills",
+      "/base/pi-profiles/shared/extensions",
+      "/base/pi-profiles/shared/prompts",
+      "/base/pi-profiles/shared/themes",
+      "/base/agents/coder/IDENTITY.md",
+      "/base/agents/coder/SOUL.md",
+      "/base/agents/coder/USER.md",
+    ]);
+  });
+
   it("debounces resource and auth/model changes separately", async () => {
     const handlers = new Map<string, (path: string) => void>();
     on.mockImplementation((event, handler) => {

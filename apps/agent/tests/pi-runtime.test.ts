@@ -396,6 +396,9 @@ describe("PiRuntime", () => {
       "/mock/agent/extensions",
       "/mock/agent/prompts",
       "/mock/agent/themes",
+      "/mock/base/agents/default/IDENTITY.md",
+      "/mock/base/agents/default/SOUL.md",
+      "/mock/base/agents/default/USER.md",
       "/mock/coder-agent/settings.json",
       "/mock/coder-agent/models.json",
       "/mock/coder-agent/auth.json",
@@ -403,7 +406,38 @@ describe("PiRuntime", () => {
       "/mock/coder-agent/extensions",
       "/mock/coder-agent/prompts",
       "/mock/coder-agent/themes",
+      "/mock/base/agents/coder/IDENTITY.md",
+      "/mock/base/agents/coder/SOUL.md",
+      "/mock/base/agents/coder/USER.md",
     ]);
+  });
+
+  it("watches shared-profile agent persona files without recreating sessions on resource reload", async () => {
+    const tempDir = join(tmpdir(), "pi-runtime-shared-persona");
+    const personaRoot = join(tempDir, "agents", "coder");
+    const config = createRuntimeConfig({
+      agents: {
+        ...createRuntimeConfig().agents,
+        coder: {
+          ...createRuntimeConfig().agents.coder,
+          personaRoot,
+          piProfile: "shared",
+          profileRoot: join(tempDir, "pi-profiles", "shared"),
+        },
+      },
+    });
+    const { createAgentSession } = await import("@mariozechner/pi-coding-agent");
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(config);
+
+    await runtime.prompt({ agentId: "coder", threadKey: "telegram__1" }, "hello", "/mock/workspace");
+    await runtime.reloadProfileResources("shared");
+
+    expect(watchedPaths).toContain(join(personaRoot, "IDENTITY.md"));
+    expect(watchedPaths).toContain(join(personaRoot, "SOUL.md"));
+    expect(watchedPaths).toContain(join(personaRoot, "USER.md"));
+    expect(resourceLoaderReloads[0]).toHaveBeenCalledTimes(2);
+    expect(createAgentSession).toHaveBeenCalledTimes(1);
   });
 
   it("uses the default agent profile root for Pi-owned settings, auth, and models files", async () => {
