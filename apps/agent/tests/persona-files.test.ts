@@ -1,4 +1,5 @@
 import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -76,9 +77,9 @@ describe("persona files", () => {
   it("validates and closes the opened file handle before accepting content", async () => {
     vi.resetModules();
     const close = vi.fn(async () => undefined);
-    const readFile = vi.fn(async () => "unsafe\n");
+    const read = vi.fn(async () => ({ bytesRead: 0, buffer: Buffer.alloc(0) }));
     const handleStat = vi.fn(async () => ({ isFile: () => false, size: 6 }));
-    const open = vi.fn(async () => ({ close, readFile, stat: handleStat }));
+    const open = vi.fn(async () => ({ close, read, stat: handleStat }));
     vi.doMock("node:fs/promises", async (importOriginal) => {
       const actual = await importOriginal<typeof import("node:fs/promises")>();
       return { ...actual, open };
@@ -89,9 +90,35 @@ describe("persona files", () => {
       await writeFile(join(root, "IDENTITY.md"), "safe-at-lstat\n");
 
       await expect(loadAgentPersonaFiles(root)).resolves.toEqual([]);
-      expect(open).toHaveBeenCalledWith(join(root, "IDENTITY.md"), "r");
+      expect(open).toHaveBeenCalledWith(join(root, "IDENTITY.md"), constants.O_RDONLY | constants.O_NOFOLLOW);
       expect(handleStat).toHaveBeenCalledTimes(1);
-      expect(readFile).not.toHaveBeenCalled();
+      expect(read).not.toHaveBeenCalled();
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
+  });
+
+  it("skips files that grow beyond the persona size limit while reading", async () => {
+    vi.resetModules();
+    const close = vi.fn(async () => undefined);
+    const read = vi.fn(async (_buffer: Buffer) => ({ bytesRead: 256 * 1024 + 1 }));
+    const handleStat = vi.fn(async () => ({ isFile: () => true, size: 5 }));
+    const open = vi.fn(async () => ({ close, read, stat: handleStat }));
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return { ...actual, open };
+    });
+    try {
+      const { loadAgentPersonaFiles } = await import("../src/pi/persona-files.js");
+      const root = await createTempDir();
+      await writeFile(join(root, "IDENTITY.md"), "safe\n");
+
+      await expect(loadAgentPersonaFiles(root)).resolves.toEqual([]);
+      expect(open).toHaveBeenCalledWith(join(root, "IDENTITY.md"), constants.O_RDONLY | constants.O_NOFOLLOW);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(read.mock.calls[0]?.[0]).toHaveLength(256 * 1024 + 1);
       expect(close).toHaveBeenCalledTimes(1);
     } finally {
       vi.doUnmock("node:fs/promises");

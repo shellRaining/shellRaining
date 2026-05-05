@@ -1,3 +1,4 @@
+import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -11,6 +12,8 @@ export interface AgentPersonaFile {
   path: string;
   content: string;
 }
+
+const PERSONA_OPEN_FLAGS = constants.O_RDONLY | constants.O_NOFOLLOW;
 
 export async function loadAgentPersonaFiles(root: string): Promise<AgentPersonaFile[]> {
   const files: AgentPersonaFile[] = [];
@@ -30,13 +33,19 @@ export async function loadAgentPersonaFiles(root: string): Promise<AgentPersonaF
 
     let handle;
     try {
-      handle = await open(filePath, "r");
+      handle = await open(filePath, PERSONA_OPEN_FLAGS);
       const handleStats = await handle.stat();
       if (!handleStats.isFile() || handleStats.size > MAX_PERSONA_FILE_BYTES) {
         continue;
       }
 
-      const content = (await handle.readFile({ encoding: "utf-8" })).trim();
+      const buffer = Buffer.allocUnsafe(MAX_PERSONA_FILE_BYTES + 1);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      if (bytesRead > MAX_PERSONA_FILE_BYTES) {
+        continue;
+      }
+
+      const content = buffer.subarray(0, bytesRead).toString("utf-8").trim();
       if (!content) {
         continue;
       }
