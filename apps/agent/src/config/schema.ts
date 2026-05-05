@@ -68,6 +68,7 @@ export interface ResolvedAgentConfig {
   id: string;
   aliases: string[];
   displayName: string;
+  personaRoot: string;
   piProfile: string;
   profileRoot: string;
 }

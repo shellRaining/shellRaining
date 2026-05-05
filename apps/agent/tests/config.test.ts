@@ -96,6 +96,7 @@ describe("config", () => {
         aliases: [],
         displayName: "shellRaining",
         id: "default",
+        personaRoot: "/mock/home/.shellRaining/agents/default",
         piProfile: "default",
         profileRoot: "/mock/home/.shellRaining/pi-profiles/default",
       },
@@ -145,6 +146,7 @@ describe("config", () => {
         aliases: ["code", "dev"],
         displayName: "Coder",
         id: "coder",
+        personaRoot: join(tempDir, "base", "agents", "coder"),
         piProfile: "coder-profile",
         profileRoot: join(tempDir, "base", "pi-profiles", "coder-profile"),
       },
@@ -152,10 +154,39 @@ describe("config", () => {
         aliases: ["review", "check"],
         displayName: "Reviewer",
         id: "reviewer",
+        personaRoot: join(tempDir, "base", "agents", "reviewer"),
         piProfile: "reviewer-profile",
         profileRoot: join(tempDir, "base", "pi-profiles", "reviewer-profile"),
       },
     });
+  });
+
+  it("keeps persona roots separate when agents share a Pi profile", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "shellraining-config-"));
+    const configPath = join(tempDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        telegram: { botToken: "file-token" },
+        paths: {
+          baseDir: join(tempDir, "base"),
+        },
+        agents: {
+          coder: { piProfile: "shared" },
+          reviewer: { piProfile: "shared" },
+        },
+      }),
+    );
+    process.env.SHELL_RAINING_CONFIG = configPath;
+    delete process.env.TELEGRAM_BOT_TOKEN;
+
+    const { loadConfig } = await import("../src/config/index.js");
+    const config = await loadConfig();
+
+    expect(config.agents.coder?.profileRoot).toBe(join(tempDir, "base", "pi-profiles", "shared"));
+    expect(config.agents.reviewer?.profileRoot).toBe(join(tempDir, "base", "pi-profiles", "shared"));
+    expect(config.agents.coder?.personaRoot).toBe(join(tempDir, "base", "agents", "coder"));
+    expect(config.agents.reviewer?.personaRoot).toBe(join(tempDir, "base", "agents", "reviewer"));
   });
 
   it("rejects unsafe Pi profile ids", async () => {

@@ -1,4 +1,5 @@
 import type { ResolvedAgentConfig, ShellRainingConfigFile } from "./schema.js";
+import { join } from "node:path";
 import { getProfileRoot } from "./path.js";
 
 function isSafeRegistryId(value: string): boolean {
@@ -36,6 +37,10 @@ function normalizeAliases(aliases: string[] | undefined): string[] {
   return normalized;
 }
 
+function getPersonaRoot(baseDir: string, agentId: string): string {
+  return join(baseDir, "agents", agentId);
+}
+
 export function resolveAgents(
   agents: ShellRainingConfigFile["agents"],
   baseDir: string,
@@ -47,6 +52,7 @@ export function resolveAgents(
         aliases: [],
         displayName: "shellRaining",
         id: "default",
+        personaRoot: getPersonaRoot(baseDir, "default"),
         piProfile: "default",
         profileRoot: getProfileRoot(baseDir, "default"),
       },
@@ -78,6 +84,7 @@ export function resolveAgents(
       aliases,
       displayName: agent?.displayName?.trim() ?? agentId,
       id: agentId,
+      personaRoot: getPersonaRoot(baseDir, agentId),
       piProfile,
       profileRoot: getProfileRoot(baseDir, piProfile),
     };
