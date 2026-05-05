@@ -54,7 +54,11 @@ export async function loadAgentPersonaFiles(root: string): Promise<AgentPersonaF
     } catch {
       continue;
     } finally {
-      await handle?.close();
+      try {
+        await handle?.close();
+      } catch {
+        // Ignore close failures so persona loading can continue safely.
+      }
     }
   }
 

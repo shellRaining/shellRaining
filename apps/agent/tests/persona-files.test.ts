@@ -132,6 +132,48 @@ describe("persona files", () => {
     }
   });
 
+  it("ignores close failures and continues loading later persona files", async () => {
+    vi.resetModules();
+    const firstClose = vi.fn(async () => {
+      throw new Error("close failed");
+    });
+    const secondClose = vi.fn(async () => undefined);
+    const firstRead = vi.fn(async (buffer: Buffer) => {
+      buffer.write("soul\n");
+      return { bytesRead: 5 };
+    });
+    const secondRead = vi.fn(async (buffer: Buffer) => {
+      buffer.write("user\n");
+      return { bytesRead: 5 };
+    });
+    const handleStat = vi.fn(async () => ({ isFile: () => true, size: 5 }));
+    const open = vi
+      .fn()
+      .mockResolvedValueOnce({ close: firstClose, read: firstRead, stat: handleStat })
+      .mockResolvedValueOnce({ close: secondClose, read: secondRead, stat: handleStat });
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return { ...actual, open };
+    });
+    try {
+      const { loadAgentPersonaFiles } = await import("../src/pi/persona-files.js");
+      const root = await createTempDir();
+      await writeFile(join(root, "SOUL.md"), "soul\n");
+      await writeFile(join(root, "USER.md"), "user\n");
+
+      await expect(loadAgentPersonaFiles(root)).resolves.toEqual([
+        { name: "SOUL.md", path: join(root, "SOUL.md"), content: "soul" },
+        { name: "USER.md", path: join(root, "USER.md"), content: "user" },
+      ]);
+      expect(open).toHaveBeenCalledTimes(2);
+      expect(firstClose).toHaveBeenCalledTimes(1);
+      expect(secondClose).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
+  });
+
   it("returns watch paths for all persona files", async () => {
     const { getAgentPersonaWatchPaths } = await import("../src/pi/persona-files.js");
     const root = join("persona", "root");
