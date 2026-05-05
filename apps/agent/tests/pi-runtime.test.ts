@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 type SessionListener = (event: unknown) => void;
 
@@ -25,12 +27,13 @@ const modelRegistryCtor = vi.fn(function ModelRegistryMock() {
   return { kind: "models", registerProvider };
 });
 const settingsManagerCreate = vi.fn(() => ({ kind: "settings" }));
-const fsAccess = vi.fn(async (_path: unknown) => undefined);
+const fsAccess = vi.hoisted(() => vi.fn(async (_path: unknown) => undefined));
 const watcherClose = vi.fn(async () => undefined);
 const watcherOn = vi.fn();
 const watchedPaths: string[] = [];
 
-vi.mock("node:fs/promises", () => ({
+vi.mock("node:fs/promises", async () => ({
+  ...(await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises")),
   access: fsAccess,
   mkdir: vi.fn(async () => undefined),
 }));
@@ -69,8 +72,8 @@ vi.mock("chokidar", () => ({
   },
 }));
 
-function createRuntimeConfig() {
-  return {
+function createRuntimeConfig(overrides: Partial<ReturnType<typeof createRuntimeConfig>> = {}) {
+  const config = {
     agents: {
       coder: {
         aliases: [],
@@ -120,6 +123,11 @@ function createRuntimeConfig() {
       defaultAgent: "default",
       showThinking: false,
     },
+  };
+
+  return {
+    ...config,
+    ...overrides,
   };
 }
 
@@ -434,6 +442,43 @@ describe("PiRuntime", () => {
     expect(result?.at(-1)).toContain("Telegram output is a chat surface");
     expect(result?.at(-1)).toContain("~/.shellRaining/inbox/");
     expect(result?.at(-1)).not.toContain("Pi may append an <available_skills> catalog later");
+  });
+
+  it("appends agent persona files to the shellRaining system prompt", async () => {
+    const { mkdir, mkdtemp, writeFile } = await vi.importActual<
+      typeof import("node:fs/promises")
+    >("node:fs/promises");
+    const tempDir = await mkdtemp(join(tmpdir(), "pi-runtime-"));
+    const personaRoot = join(tempDir, "agents", "coder");
+    await mkdir(personaRoot, { recursive: true });
+    await writeFile(join(personaRoot, "SOUL.md"), "Speak like a pragmatic coding partner.");
+    const config = createRuntimeConfig({
+      agents: {
+        ...createRuntimeConfig().agents,
+        coder: {
+          ...createRuntimeConfig().agents.coder,
+          personaRoot,
+          profileRoot: join(tempDir, "pi-profiles", "shared"),
+        },
+      },
+      telegram: {
+        ...createRuntimeConfig().telegram,
+        defaultAgent: "coder",
+      },
+    });
+    const { PiRuntime } = await import("../src/pi/runtime.js");
+    const runtime = new PiRuntime(config);
+
+    await runtime.prompt({ agentId: "coder", threadKey: "telegram__1" }, "hello", "/mock/workspace");
+
+    const options = defaultResourceLoader.mock.calls.at(0)?.at(0) as unknown as {
+      appendSystemPromptOverride?: (base: string[]) => string[];
+    };
+    const result = options.appendSystemPromptOverride?.(["base prompt"]);
+
+    expect(result?.join("\n")).toContain("# Agent Persona Context");
+    expect(result?.join("\n")).toContain("## SOUL.md");
+    expect(result?.join("\n")).toContain("Speak like a pragmatic coding partner.");
   });
 
   it("captures showThinking from the config source at prompt start", async () => {

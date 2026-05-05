@@ -11,10 +11,11 @@ import {
   type ExtensionFactory,
   type SessionInfo,
 } from "@mariozechner/pi-coding-agent";
-import { readConfig, type ConfigSource } from "../config/index.js";
+import { readConfig, type ConfigSource, type ResolvedAgentConfig } from "../config/index.js";
 import { getTelegramInboxDisplayPath } from "../config/path.js";
 import { createNoopLogger, type Logger } from "../logging/service.js";
 import { buildShellRainingSystemPrompt } from "../system-prompt/index.js";
+import { buildAgentPersonaPrompt, loadAgentPersonaFiles } from "./persona-files.js";
 import { ProfileWatcher } from "./profile-watcher.js";
 import { getSessionDirectoryForScope, getSessionDirectoryForThread } from "./session-store.js";
 
@@ -124,7 +125,10 @@ export class PiRuntime {
       },
       "Pi session creation started",
     );
-    const profileRoot = this.getAgentProfileRoot(scope.agentId);
+    const agent = this.getAgentConfig(scope.agentId);
+    const profileRoot = agent.profileRoot;
+    const personaFiles = await loadAgentPersonaFiles(agent.personaRoot);
+    const personaPrompt = buildAgentPersonaPrompt(personaFiles);
     this.ensureProfileWatcher(scope.agentId);
     const sessionDir = await this.resolveSessionDir(scope, mode);
     await mkdir(sessionDir, { recursive: true });
@@ -141,6 +145,7 @@ export class PiRuntime {
         ...base,
         buildShellRainingSystemPrompt({
           environmentName: "shellRaining",
+          extraSections: [personaPrompt],
           telegram: {
             inboxDir: getTelegramInboxDisplayPath(),
             outputStyle: "chat",
@@ -195,12 +200,12 @@ export class PiRuntime {
     return scopedSessionDir;
   }
 
-  private getAgentProfileRoot(agentId: string): string {
+  private getAgentConfig(agentId: string): ResolvedAgentConfig {
     const agent = this.config.agents[agentId];
     if (agent === undefined) {
       throw new Error(`Agent is not configured: ${agentId}`);
     }
-    return agent.profileRoot;
+    return agent;
   }
 
   private ensureProfileWatcher(agentId: string): void {
