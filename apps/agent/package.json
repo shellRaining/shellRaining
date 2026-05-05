@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --dir ../.. --filter @shellraining/system-prompt build && tsx watch src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsgo -p tsconfig.json",
     "start": "node dist/src/index.js",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
@@ -16,7 +16,6 @@
     "@hono/node-server": "^1.14.1",
     "@mariozechner/pi-coding-agent": "^0.62.0",
     "@shellraining/cron": "workspace:*",
-    "@shellraining/system-prompt": "workspace:*",
     "@sinclair/typebox": "^0.34.41",
     "c12": "4.0.0-beta.4",
     "chat": "^4.26.0",

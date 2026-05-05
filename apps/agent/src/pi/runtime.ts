@@ -14,7 +14,7 @@ import {
 import { readConfig, type ConfigSource } from "../config/index.js";
 import { getTelegramInboxDisplayPath } from "../config/path.js";
 import { createNoopLogger, type Logger } from "../logging/service.js";
-import { buildShellRainingSystemPrompt } from "@shellraining/system-prompt";
+import { buildShellRainingSystemPrompt } from "../system-prompt/index.js";
 import { ProfileWatcher } from "./profile-watcher.js";
 import { getSessionDirectoryForScope, getSessionDirectoryForThread } from "./session-store.js";
 
