@@ -67,6 +67,7 @@ describe("ProfileWatcher", () => {
       "/base/pi-profiles/shared/extensions",
       "/base/pi-profiles/shared/prompts",
       "/base/pi-profiles/shared/themes",
+      "/base/agents",
       "/base/agents/coder",
       "/base/agents/coder/IDENTITY.md",
       "/base/agents/coder/SOUL.md",
@@ -74,7 +75,7 @@ describe("ProfileWatcher", () => {
     ]);
   });
 
-  it("treats agent persona root and files as resource changes", async () => {
+  it("treats agent persona parent, root, and files as resource changes", async () => {
     const handlers = new Map<string, (path: string) => void>();
     on.mockImplementation((event, handler) => {
       handlers.set(event, handler);
@@ -92,16 +93,22 @@ describe("ProfileWatcher", () => {
       resourceRoots: ["/base/agents/coder"],
     });
 
-    handlers.get("addDir")?.("/base/agents/coder");
+    handlers.get("addDir")?.("/base/agents");
     await vi.advanceTimersByTimeAsync(10);
 
     expect(onResourceChange).toHaveBeenCalledWith("shared");
     expect(onAuthOrModelChange).not.toHaveBeenCalled();
 
-    handlers.get("add")?.("/base/agents/coder/SOUL.md");
+    handlers.get("addDir")?.("/base/agents/coder");
     await vi.advanceTimersByTimeAsync(10);
 
     expect(onResourceChange).toHaveBeenCalledTimes(2);
+    expect(onAuthOrModelChange).not.toHaveBeenCalled();
+
+    handlers.get("add")?.("/base/agents/coder/SOUL.md");
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(onResourceChange).toHaveBeenCalledTimes(3);
     expect(onAuthOrModelChange).not.toHaveBeenCalled();
   });
 
@@ -121,6 +128,8 @@ describe("ProfileWatcher", () => {
     expect(watchedPaths.filter((path) => path === "/base/agents/coder/IDENTITY.md")).toHaveLength(
       1,
     );
+    expect(watchedPaths.filter((path) => path === "/base/agents")).toHaveLength(1);
+    expect(watchedPaths.filter((path) => path === "/base/agents/coder")).toHaveLength(1);
     expect(watchedPaths.filter((path) => path === "/base/agents/coder/SOUL.md")).toHaveLength(1);
     expect(watchedPaths.filter((path) => path === "/base/agents/coder/USER.md")).toHaveLength(1);
   });

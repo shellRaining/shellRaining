@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
 import { createNoopLogger, type Logger } from "../logging/service.js";
 import { getAgentPersonaWatchPaths } from "./persona-files.js";
@@ -18,13 +18,17 @@ type ChangeKind = "auth-or-model" | "resource";
 const RESOURCE_DIRS = ["skills", "extensions", "prompts", "themes"] as const;
 
 function getWatchedProfilePaths(profileRoot: string, resourceRoots: string[] = []): string[] {
-  const uniqueResourceRoots = [...new Set(resourceRoots)];
+  const uniqueResourcePaths = [
+    ...new Set(
+      resourceRoots.flatMap((root) => [dirname(root), root, ...getAgentPersonaWatchPaths(root)]),
+    ),
+  ];
   return [
     join(profileRoot, "settings.json"),
     join(profileRoot, "models.json"),
     join(profileRoot, "auth.json"),
     ...RESOURCE_DIRS.map((dir) => join(profileRoot, dir)),
-    ...uniqueResourceRoots.flatMap((root) => [root, ...getAgentPersonaWatchPaths(root)]),
+    ...uniqueResourcePaths,
   ];
 }
 

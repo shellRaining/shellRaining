@@ -399,6 +399,7 @@ describe("PiRuntime", () => {
       "/mock/agent/extensions",
       "/mock/agent/prompts",
       "/mock/agent/themes",
+      "/mock/base/agents",
       "/mock/base/agents/default",
       "/mock/base/agents/default/IDENTITY.md",
       "/mock/base/agents/default/SOUL.md",
@@ -410,6 +411,7 @@ describe("PiRuntime", () => {
       "/mock/coder-agent/extensions",
       "/mock/coder-agent/prompts",
       "/mock/coder-agent/themes",
+      "/mock/base/agents",
       "/mock/base/agents/coder",
       "/mock/base/agents/coder/IDENTITY.md",
       "/mock/base/agents/coder/SOUL.md",
@@ -443,6 +445,7 @@ describe("PiRuntime", () => {
     await runtime.reloadProfileResources("shared");
 
     expect(watchedPaths).toContain(join(personaRoot, "IDENTITY.md"));
+    expect(watchedPaths).toContain(join(personaRoot, ".."));
     expect(watchedPaths).toContain(join(personaRoot, "SOUL.md"));
     expect(watchedPaths).toContain(join(personaRoot, "USER.md"));
     expect(resourceLoaderReloads[0]).toHaveBeenCalledTimes(2);
