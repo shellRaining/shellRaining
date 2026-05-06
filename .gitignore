@@ -3,4 +3,5 @@ dist/
 .env
 coverage/
 /.claude/worktrees
+/.worktree
 /.worktrees
