@@ -68,11 +68,11 @@ async function execCommand(command: string, cwd: string, timeoutMs: number) {
 
 function resolveCronPromptTimezone(job: AgentCronJob): string {
   if (job.schedule.kind !== "cron") {
-    return "UTC";
+    return config.runtime.timeZone ?? "UTC";
   }
 
   const timezone = job.schedule.tz?.trim();
-  return timezone ?? "UTC";
+  return timezone ?? config.runtime.timeZone ?? "UTC";
 }
 
 function buildCronPromptText(job: AgentCronJob, nowMs: number): string {

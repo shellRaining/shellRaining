@@ -91,6 +91,7 @@ describe("config", () => {
       level: "info",
     });
     expect(config.telegram.defaultAgent).toBe("default");
+    expect(config.runtime).toEqual({});
     expect(config.agents).toEqual({
       default: {
         aliases: [],
@@ -357,6 +358,9 @@ describe("config", () => {
           runTimeoutMs: 1000,
           misfireGraceMs: 2000,
         },
+        runtime: {
+          timeZone: "Asia/Shanghai",
+        },
         logging: {
           level: "debug",
           file: {
@@ -393,6 +397,7 @@ describe("config", () => {
     expect(config.cron.jobsPath).toBe("/mock/home/.shellRaining/cron/jobs.json");
     expect(config.cron.runTimeoutMs).toBe(1000);
     expect(config.cron.misfireGraceMs).toBe(2000);
+    expect(config.runtime.timeZone).toBe("Asia/Shanghai");
     expect(config.logging).toEqual({
       file: {
         enabled: true,
@@ -420,6 +425,7 @@ describe("config", () => {
       JSON.stringify({
         server: { port: 4567 },
         paths: { baseDir: join(tempDir, "file-base") },
+        runtime: { timeZone: "UTC" },
         telegram: { botToken: "file-token", allowedUsers: [123], showThinking: false },
       }),
     );
@@ -430,6 +436,7 @@ describe("config", () => {
     process.env.SHELL_RAINING_BASE_DIR = join(tempDir, "env-base");
     process.env.SHELL_RAINING_ALLOWED_USERS = "789,101";
     process.env.SHELL_RAINING_SHOW_THINKING = "true";
+    process.env.SHELL_RAINING_TIME_ZONE = "Asia/Shanghai";
 
     const { loadConfig } = await import("../src/config/index.js");
     const config = await loadConfig();
@@ -439,6 +446,7 @@ describe("config", () => {
     expect(config.paths.baseDir).toBe(join(tempDir, "env-base"));
     expect(config.telegram.allowedUsers).toEqual([789, 101]);
     expect(config.telegram.showThinking).toBe(true);
+    expect(config.runtime.timeZone).toBe("Asia/Shanghai");
     expect(config.agents.default?.profileRoot).toBe(
       join(tempDir, "env-base", "pi-profiles", "default"),
     );

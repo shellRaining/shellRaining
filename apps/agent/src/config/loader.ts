@@ -91,6 +91,9 @@ export function resolveConfig(fileConfig: ShellRainingConfigFile): Config {
 
   return {
     server: { port },
+    runtime: {
+      timeZone: resolveConfigValue(fileConfig.runtime?.timeZone),
+    },
     telegram: {
       botToken: token,
       apiBaseUrl:

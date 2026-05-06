@@ -17,6 +17,10 @@ function resolveNow(nowMs?: number, timeZone = "UTC"): DateTime {
   return DateTime.fromMillis(nowMs ?? Date.now(), { zone: timeZone });
 }
 
+function resolveDefaultTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
 export function injectPromptTimestampPrefix(
   message: string,
   options?: { nowMs?: number; timeZone?: string },
@@ -32,7 +36,7 @@ export function injectPromptTimestampPrefix(
     return base;
   }
 
-  const timeZone = options?.timeZone ?? "UTC";
+  const timeZone = options?.timeZone ?? resolveDefaultTimeZone();
   const now = resolveNow(options?.nowMs, timeZone);
   const resolved = now.isValid ? now : resolveNow(options?.nowMs, "UTC");
   const zoneLabel = now.isValid ? timeZone : "UTC";
@@ -48,7 +52,7 @@ export function appendCurrentTimeLine(
     return base;
   }
 
-  const timeZone = options?.timeZone ?? "UTC";
+  const timeZone = options?.timeZone ?? resolveDefaultTimeZone();
   const localNow = resolveNow(options?.nowMs, timeZone);
   const resolvedLocal = localNow.isValid ? localNow : resolveNow(options?.nowMs, "UTC");
   const localZoneLabel = localNow.isValid ? timeZone : "UTC";

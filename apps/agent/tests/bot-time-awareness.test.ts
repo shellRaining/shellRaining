@@ -103,6 +103,9 @@ function createConfig() {
       baseDir: "/mock/base",
       workspace: "/mock/workspace",
     },
+    runtime: {
+      timeZone: "Asia/Shanghai",
+    },
     server: {
       port: 1234,
     },
@@ -149,9 +152,9 @@ describe("bot time awareness", () => {
     });
   });
 
-  it("prefixes direct telegram prompts with a weekday timestamp", async () => {
+  it("prefixes direct telegram prompts with a China timezone weekday timestamp", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-04-16T09:00:00.000Z"));
+    vi.setSystemTime(new Date("2026-05-06T00:49:00.000Z"));
 
     const { createBot } = await import("../src/bot.js");
     const bot = createBot(createConfig(), createRuntime() as never);
@@ -177,7 +180,7 @@ describe("bot time awareness", () => {
       threadKey: "telegram__1",
     });
     expect(runtimePrompt.mock.calls[0]?.[1]).toContain("帮我总结今天做过的事情");
-    expect(runtimePrompt.mock.calls[0]?.[1]).toContain("[Thu 2026-04-16 09:00 UTC]");
+    expect(runtimePrompt.mock.calls[0]?.[1]).toContain("[Wed 2026-05-06 08:49 Asia/Shanghai]");
 
     vi.useRealTimers();
   });
@@ -215,7 +218,7 @@ describe("bot time awareness", () => {
     expect(steer).toHaveBeenCalledTimes(1);
     expect(steer.mock.calls[0]?.[0]).toEqual({ agentId: "default", threadKey: "telegram__1" });
     expect(steer.mock.calls[0]?.[1]).toContain("继续刚才那个任务");
-    expect(steer.mock.calls[0]?.[1]).toContain("[Thu 2026-04-16 09:00 UTC]");
+    expect(steer.mock.calls[0]?.[1]).toContain("[Thu 2026-04-16 17:00 Asia/Shanghai]");
 
     vi.useRealTimers();
   });
@@ -250,7 +253,7 @@ describe("bot time awareness", () => {
     await onDirectMessageHandler?.(thread, message);
 
     expect(runtimePrompt).toHaveBeenCalledTimes(1);
-    expect(runtimePrompt.mock.calls[0]?.[1]).toContain("[Thu 2026-04-16 09:00 UTC]");
+    expect(runtimePrompt.mock.calls[0]?.[1]).toContain("[Thu 2026-04-16 17:00 Asia/Shanghai]");
     expect(runtimePrompt.mock.calls[0]?.[1]).toContain("请把提示词里的 Current time: 改成 Now:");
 
     vi.useRealTimers();

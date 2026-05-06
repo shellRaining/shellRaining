@@ -20,6 +20,9 @@ export function buildEnvOverrides(): ShellRainingConfigFile {
     server: {
       port: parseOptionalNumber(process.env.SHELL_RAINING_PORT),
     },
+    runtime: {
+      timeZone: resolveConfigValue(process.env.SHELL_RAINING_TIME_ZONE),
+    },
     stt: {
       apiKey: resolveConfigValue(process.env.SHELL_RAINING_STT_API_KEY),
       baseUrl: resolveConfigValue(process.env.SHELL_RAINING_STT_BASE_URL),

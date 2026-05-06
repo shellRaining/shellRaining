@@ -10,6 +10,10 @@ export interface Config {
     /** HTTP server listen port. @defaultValue 3457 */
     port: number;
   };
+  runtime: {
+    /** Default IANA time zone for runtime-generated time context. */
+    timeZone?: string;
+  };
   telegram: {
     /** Telegram Bot API token. **Required.** */
     botToken: string;
@@ -79,6 +83,14 @@ export const shellRainingConfigFileSchema = Type.Object(
       Type.Object(
         {
           port: Type.Optional(Type.Number()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    runtime: Type.Optional(
+      Type.Object(
+        {
+          timeZone: Type.Optional(Type.String()),
         },
         { additionalProperties: false },
       ),
@@ -208,6 +220,7 @@ export const shellRainingConfigDefaults: ShellRainingConfigFile = {
   server: {
     port: 3457,
   },
+  runtime: {},
   telegram: {
     allowedUsers: [],
     showThinking: false,

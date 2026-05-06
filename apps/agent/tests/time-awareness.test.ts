@@ -5,6 +5,14 @@ import {
 } from "../src/runtime/time-awareness.js";
 
 describe("time-awareness helper", () => {
+  it("uses the runtime environment timezone when no timezone is provided", () => {
+    expect(
+      injectPromptTimestampPrefix("hello", {
+        nowMs: Date.parse("2026-05-06T00:49:00.000Z"),
+      }),
+    ).not.toBe("[Wed 2026-05-06 00:49 UTC] hello");
+  });
+
   it("falls back to UTC when prefix timezone is invalid", () => {
     expect(
       injectPromptTimestampPrefix("hello", {

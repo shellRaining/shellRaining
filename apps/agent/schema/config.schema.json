@@ -13,6 +13,15 @@
         }
       }
     },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeZone": {
+          "type": "string"
+        }
+      }
+    },
     "telegram": {
       "type": "object",
       "additionalProperties": false,

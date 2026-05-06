@@ -29,6 +29,7 @@ function createConfig(): Config {
       level: "info",
     },
     paths: { baseDir: "/base", workspace: "/workspace" },
+    runtime: {},
     server: { port: 3457 },
     stt: {},
     telegram: {

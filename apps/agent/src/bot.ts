@@ -364,7 +364,9 @@ async function handlePrompt(
     return;
   }
 
-  const promptText = injectPromptTimestampPrefix(normalized.text);
+  const promptText = injectPromptTimestampPrefix(normalized.text, {
+    timeZone: config.runtime.timeZone,
+  });
 
   if (runtime.isRunning(scope)) {
     // 消息注入到正在运行的 session，最终回复由最初那条 prompt 的 handler 统一发送，

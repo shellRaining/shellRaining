@@ -59,6 +59,7 @@ function createConfig() {
       baseDir: "/mock/base",
       workspace: "/mock/workspace",
     },
+    runtime: {},
     server: {
       port: 1234,
     },

@@ -98,6 +98,7 @@ export function buildEffectiveConfig(
     cron: { ...previous.cron },
     logging: { ...previous.logging, file: { ...previous.logging.file } },
     paths: { ...previous.paths },
+    runtime: { ...previous.runtime },
     server: { ...previous.server },
     stt: { ...previous.stt },
     telegram: { ...previous.telegram, allowedUsers: [...previous.telegram.allowedUsers] },
