@@ -4,9 +4,20 @@ import type {
   ExtensionAPI,
   ExtensionFactory,
 } from "@mariozechner/pi-coding-agent";
-import type { CronService } from "@shellraining/cron";
+import type { CronService, CronSchedule } from "@shellraining/cron";
 import { normalizeCronJobInput, type CronJobInput } from "./normalize.js";
 import type { AgentCronJob } from "./types.js";
+
+/**
+ * LLMs sometimes serialize nested objects as JSON strings in tool call params.
+ * This helper parses a schedule value that may arrive as a string.
+ */
+function parseSchedule(raw: unknown): CronSchedule {
+  if (typeof raw === "string") {
+    return JSON.parse(raw) as CronSchedule;
+  }
+  return raw as CronSchedule;
+}
 
 function textResult(text: string): AgentToolResult<{ text: string }> {
   return {
@@ -86,6 +97,7 @@ export function buildCronExtensionFactory(
         const job = await service.add(
           normalizeCronJobInput({
             ...params,
+            schedule: parseSchedule(params.schedule),
             chatId: thread.chatId,
             threadId: thread.threadId,
             threadKey: thread.threadKey,
