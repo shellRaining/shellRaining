@@ -1,54 +1,98 @@
 # shellRaining
 
-Telegram-first personal coding agent for shellraining.
+## What
 
-Core stack:
+Telegram-first personal coding agent.
 
-- Pi CodingAgent SDK
-- Vercel Chat SDK Telegram adapter
-- Hono webhook server
+## Features
 
-Features in v0:
+- Telegram DM / mention
+- Persistent Pi sessions
+- Workspace navigation
+- File and image input
+- Voice input with optional STT
+- File artifact upload
+- Scheduled tasks
+- Docker service deployment
 
-- Telegram DM and mention entrypoints
-- Persistent per-thread Pi sessions with `/session` listing and switching
-- Persistent workspace state
-- Pi skills sync via `~/.pi/agent/settings.json`
-- Tool activity status updates
-- File artifact detection and Telegram upload
-- Commands: `/start`, `/help`, `/pwd`, `/cd`, `/home`, `/session`, `/session switch <n>`, `/new`, `/status`
+## Requirements
 
-Telegram input support:
+- Node.js 20-24
+- pnpm 10
+- Telegram Bot Token
+- Public HTTPS webhook URL
+- Optional Docker / Docker Compose
+- Optional local Telegram Bot API server
 
-- Text and emoji are sent to Pi as prompt text.
-- Telegram photo/image attachments are downloaded, saved under `~/.shellRaining/inbox/`, and passed to Pi as image inputs.
-- Telegram document attachments such as TXT, PDF, and XLSX are downloaded and sent to Pi as local absolute file paths. shellRaining does not parse document contents itself.
-- Telegram voice/audio attachments are downloaded and sent as local absolute file paths. When STT is configured, the transcript is included in the prompt.
-- Telegram stickers are represented as lightweight text using their sticker emoji when Telegram provides one.
-- shellRaining does not apply an internal attachment size cap. With Telegram's cloud Bot API, `getFile` can only download files up to 20 MB; for larger Telegram files, run a local Bot API server and set `TELEGRAM_API_BASE_URL`.
-- When the local Bot API server runs in Docker, set `TELEGRAM_LOCAL_FILE_SERVER_ROOT=/var/lib/telegram-bot-api` and `TELEGRAM_LOCAL_FILE_HOST_ROOT` to the host bind mount so container file paths can be read by shellRaining.
+## Configuration
 
-Optional STT configuration:
+- `TELEGRAM_BOT_TOKEN`: Telegram bot token. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token it returns.
+- `TELEGRAM_WEBHOOK_SECRET`: Secret token used to verify incoming Telegram webhook requests. Generate a random string and use the same value when registering the webhook.
 
-```bash
-SHELL_RAINING_STT_BASE_URL=https://stt.example.com
-SHELL_RAINING_STT_API_KEY=optional-token
-SHELL_RAINING_STT_MODEL=whisper-1
-```
+Optional runtime variables:
 
-Runtime notes:
+- `SHELL_RAINING_ALLOWED_USERS`: Comma-separated Telegram user IDs allowed to use the bot. Get your user ID from a Telegram ID bot or from Telegram update payloads.
+- `SHELL_RAINING_WORKSPACE`: Directory the agent starts in. Set this to a host-mounted path when running in Docker.
+- `TELEGRAM_API_BASE_URL`: Custom Telegram Bot API endpoint. Leave empty to use the official API; set it only when running a local Telegram Bot API server.
 
-- Start the service with `pnpm dev` or `pnpm start` after `pnpm build`.
-- Telegram should be configured to send webhooks to `/webhook/telegram`.
-- On startup, shellRaining merges `SHELL_RAINING_SKILLS_DIR` into `~/.pi/agent/settings.json` and writes a backup under `~/.shellRaining/backups/` when changes are needed.
-
-Development:
+## Run Locally
 
 ```bash
 pnpm install
 cp .env.example .env
-pnpm test
 pnpm dev
-pnpm run lint
-pnpm run fmt
+```
+
+## Production
+
+```bash
+pnpm build
+pnpm start
+```
+
+## Docker
+
+```bash
+docker build -t shellraining:local .
+docker compose up -d
+```
+
+Notes:
+
+- Default port: `3457`
+- Health check: `/health`
+- Webhook path: `/webhook/telegram`
+- Runtime state: `~/.shellRaining`
+- Default workspace: `~/.shellRaining/shellRaining-workspace`
+- Set `SHELL_RAINING_WORKSPACE` explicitly for Docker deployment
+
+## Telegram Webhook
+
+Webhook URL:
+
+```text
+https://<your-domain>/webhook/telegram
+```
+
+The local Telegram Bot API server is optional. Without it, shellRaining uses the official Telegram API.
+
+## Commands
+
+- `/start`
+- `/help`
+- `/pwd`
+- `/cd`
+- `/home`
+- `/session`
+- `/new`
+- `/status`
+
+## Development
+
+```bash
+pnpm test
+pnpm build
+pnpm check
+pnpm lint
+pnpm fmt
 ```
