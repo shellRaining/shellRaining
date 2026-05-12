@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+docs/superpowers/plans
+docs/superpowers/specs
+.DS_Store
+npm-debug.log*
+pnpm-debug.log*
